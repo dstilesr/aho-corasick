@@ -499,7 +499,76 @@ mod tests {
     }
 
     #[test]
-    fn test_adj_links_medium() {}
+    fn test_adj_links_medium() {
+        let pt = create_prefix_tree(vec![
+            String::from("a"),
+            String::from("ab"),
+            String::from("bab"),
+            String::from("bca"),
+            String::from("caa"),
+            String::from("bc"),
+        ])
+        .unwrap();
+
+        let a_node = pt.node_by_path("a").unwrap();
+        let b_node = pt.node_by_path("b").unwrap();
+        let c_node = pt.node_by_path("c").unwrap();
+
+        let ab_node = pt.node_by_path("ab").unwrap();
+        let ba_node = pt.node_by_path("ba").unwrap();
+        let bc_node = pt.node_by_path("bc").unwrap();
+        let ca_node = pt.node_by_path("ca").unwrap();
+        let caa_node = pt.node_by_path("caa").unwrap();
+        let bca_node = pt.node_by_path("bca").unwrap();
+        let bab_node = pt.node_by_path("bab").unwrap();
+
+        // ba -> a
+        if let Some(Link(_, nid)) = pt.get_node(ba_node).unwrap().adj_node() {
+            assert_eq!(*nid, a_node);
+        } else {
+            panic!("Expected an adjacent node!")
+        }
+
+        // ca -> a
+        if let Some(Link(_, nid)) = pt.get_node(ca_node).unwrap().adj_node() {
+            assert_eq!(*nid, a_node);
+        } else {
+            panic!("Expected an adjacent node!")
+        }
+
+        // bc -> c
+        if let Some(Link(_, nid)) = pt.get_node(bc_node).unwrap().adj_node() {
+            assert_eq!(*nid, c_node);
+        } else {
+            panic!("Expected an adjacent node!")
+        }
+
+        // ab -> b
+        if let Some(Link(_, nid)) = pt.get_node(ab_node).unwrap().adj_node() {
+            assert_eq!(*nid, b_node);
+        } else {
+            panic!("Expected an adjacent node!")
+        }
+
+        // caa -> a
+        if let Some(Link(_, nid)) = pt.get_node(caa_node).unwrap().adj_node() {
+            assert_eq!(*nid, a_node);
+        } else {
+            panic!("Expected an adjacent node!")
+        }
+
+        // bca -> a
+        if let Some(Link(_, nid)) = pt.get_node(bca_node).unwrap().adj_node() {
+            assert_eq!(*nid, a_node);
+        } else {
+            panic!("Expected an adjacent node!")
+        }
+
+        // bab -> none
+        if let Some(_) = dbg!(pt.get_node(bab_node).unwrap().adj_node()) {
+            panic!("Expected no adjacent node for 'bab'!");
+        }
+    }
 
     #[test]
     #[should_panic]
