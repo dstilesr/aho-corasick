@@ -464,12 +464,12 @@ mod tests {
         .unwrap();
 
         assert_eq!(pt.root_node().next_nodes().len(), 3);
-        let ab_node = pt.node_by_path("ab").unwrap();
-        let b_node = pt.node_by_path("b").unwrap();
-        let c_node = pt.node_by_path("c").unwrap();
-        let bc_node = pt.node_by_path("bc").unwrap();
-        let abc_node = pt.node_by_path("abc").unwrap();
-        let bcd_node = pt.node_by_path("bcd").unwrap();
+        let ab_node = dbg!(pt.node_by_path("ab").unwrap());
+        let b_node = dbg!(pt.node_by_path("b").unwrap());
+        let c_node = dbg!(pt.node_by_path("c").unwrap());
+        let bc_node = dbg!(pt.node_by_path("bc").unwrap());
+        let abc_node = dbg!(pt.node_by_path("abc").unwrap());
+        let bcd_node = dbg!(pt.node_by_path("bcd").unwrap());
 
         // bc -> c
         if let Some(Link(_, nid)) = pt.get_node(bc_node).unwrap().adj_node() {
@@ -510,17 +510,17 @@ mod tests {
         ])
         .unwrap();
 
-        let a_node = pt.node_by_path("a").unwrap();
-        let b_node = pt.node_by_path("b").unwrap();
-        let c_node = pt.node_by_path("c").unwrap();
+        let a_node = dbg!(pt.node_by_path("a").unwrap());
+        let b_node = dbg!(pt.node_by_path("b").unwrap());
+        let c_node = dbg!(pt.node_by_path("c").unwrap());
 
-        let ab_node = pt.node_by_path("ab").unwrap();
-        let ba_node = pt.node_by_path("ba").unwrap();
-        let bc_node = pt.node_by_path("bc").unwrap();
-        let ca_node = pt.node_by_path("ca").unwrap();
-        let caa_node = pt.node_by_path("caa").unwrap();
-        let bca_node = pt.node_by_path("bca").unwrap();
-        let bab_node = pt.node_by_path("bab").unwrap();
+        let ab_node = dbg!(pt.node_by_path("ab").unwrap());
+        let ba_node = dbg!(pt.node_by_path("ba").unwrap());
+        let bc_node = dbg!(pt.node_by_path("bc").unwrap());
+        let ca_node = dbg!(pt.node_by_path("ca").unwrap());
+        let caa_node = dbg!(pt.node_by_path("caa").unwrap());
+        let bca_node = dbg!(pt.node_by_path("bca").unwrap());
+        let bab_node = dbg!(pt.node_by_path("bab").unwrap());
 
         // ba -> a
         if let Some(Link(_, nid)) = pt.get_node(ba_node).unwrap().adj_node() {
