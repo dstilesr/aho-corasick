@@ -192,11 +192,17 @@ impl TrieRoot {
         Ok(())
     }
 
-    /// Find the failure link target for a node at a given path.
+    /// Find the non-redundant failure link target for a node.
     ///
     /// This follows the parent's failure chain to find the longest proper suffix
-    /// that exists in the trie and can be reached via the given edge character.
-    fn find_failure_target(&self, parent_id: NodeId, edge_char: char) -> Option<NodeId> {
+    /// that exists in the trie, can be reached via the given edge character, AND
+    /// would not already be in the active set through parent's adj link.
+    fn find_failure_target(
+        &self,
+        parent_id: NodeId,
+        edge_char: char,
+        parent_adj_id: Option<NodeId>,
+    ) -> Option<NodeId> {
         // Children of root fail to root (not stored)
         if parent_id == self.root_node_id() {
             return None;
@@ -211,7 +217,21 @@ impl TrieRoot {
 
             // Try to follow edge_char from this node
             if let Some(nid) = follow_links!(current_node.next_nodes(), edge_char).next() {
-                return Some(nid);
+                // Check if this target would be redundant
+                if let Some(parent_adj) = parent_adj_id {
+                    let parent_adj_node = self.get_node(parent_adj).unwrap();
+                    let is_redundant = follow_links!(parent_adj_node.next_nodes(), edge_char)
+                        .any(|adj_nid| adj_nid == nid);
+
+                    if !is_redundant {
+                        // Found non-redundant suffix
+                        return Some(nid);
+                    }
+                    // Otherwise continue searching for shorter suffix
+                } else {
+                    // Parent has no adj, so this is not redundant
+                    return Some(nid);
+                }
             }
 
             // Not found, follow this node's failure link
@@ -220,7 +240,18 @@ impl TrieRoot {
 
         // Last resort: check if root has this edge
         if let Some(nid) = follow_links!(self.root_node().next_nodes(), edge_char).next() {
-            return Some(nid);
+            // Check redundancy with parent's adj
+            if let Some(parent_adj) = parent_adj_id {
+                let parent_adj_node = self.get_node(parent_adj).unwrap();
+                let is_redundant = follow_links!(parent_adj_node.next_nodes(), edge_char)
+                    .any(|adj_nid| adj_nid == nid);
+
+                if !is_redundant {
+                    return Some(nid);
+                }
+            } else {
+                return Some(nid);
+            }
         }
 
         None
@@ -241,29 +272,16 @@ impl TrieRoot {
 
         // Process each node in BFS order
         while let Some((parent_id, current_id, edge_char)) = queue.pop_front() {
-            // Find failure link target for current node
-            let failure_target = self.find_failure_target(parent_id, edge_char);
+            // Get parent's adj link if it exists
+            let parent_node = self.get_node(parent_id)?;
+            let parent_adj_id = parent_node.adj_node().map(|Link(_, nid)| *nid);
 
-            // Only add adj link if it provides new information (not redundant)
+            // Find failure link target for current node (non-redundant)
+            let failure_target = self.find_failure_target(parent_id, edge_char, parent_adj_id);
+
+            // Add adj link if one was found
             if let Some(target_id) = failure_target {
-                let parent_node = self.get_node(parent_id)?;
-
-                if let Some(Link(_, parent_adj_id)) = parent_node.adj_node() {
-                    let parent_adj_node = self.get_node(*parent_adj_id)?;
-
-                    // Check if parent's adj already reaches failure_target via same char
-                    let parent_adj_reaches_target =
-                        follow_links!(parent_adj_node.next_nodes(), edge_char)
-                            .any(|nid| nid == target_id);
-
-                    if !parent_adj_reaches_target {
-                        // Not redundant, add the link
-                        self.add_link(current_id, target_id, edge_char, true)?;
-                    }
-                } else {
-                    // Parent has no adj, so we need this link
-                    self.add_link(current_id, target_id, edge_char, true)?;
-                }
+                self.add_link(current_id, target_id, edge_char, true)?;
             }
 
             // Add children of current node to queue
@@ -479,6 +497,9 @@ mod tests {
             panic!("Expected an adjacent node!")
         }
     }
+
+    #[test]
+    fn test_adj_links_medium() {}
 
     #[test]
     #[should_panic]
