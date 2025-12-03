@@ -9,6 +9,7 @@ pub enum SearchError {
     InvalidNodeId(usize),
     DuplicateNode,
     InvalidDictionary,
+    MissingLink(usize),
 }
 
 pub type SearchResult<T> = Result<T, SearchError>;
@@ -93,6 +94,17 @@ impl Node {
             Node::MedNode { nxt: _, adj } => adj,
         };
         out.as_ref()
+    }
+
+    pub fn has_adj_node(&self) -> bool {
+        self.adj_node().is_some()
+    }
+
+    pub fn follow_link(&self, ch: char) -> Option<&Link> {
+        self.next_nodes()
+            .iter()
+            .filter(|Link(c, _)| *c == ch)
+            .next()
     }
 }
 
@@ -192,71 +204,6 @@ impl TrieRoot {
         Ok(())
     }
 
-    /// Find the non-redundant failure link target for a node.
-    ///
-    /// This follows the parent's failure chain to find the longest proper suffix
-    /// that exists in the trie, can be reached via the given edge character, AND
-    /// would not already be in the active set through parent's adj link.
-    fn find_failure_target(
-        &self,
-        parent_id: NodeId,
-        edge_char: char,
-        parent_adj_id: Option<NodeId>,
-    ) -> Option<NodeId> {
-        // Children of root fail to root (not stored)
-        if parent_id == self.root_node_id() {
-            return None;
-        }
-
-        let parent_node = self.get_node(parent_id).unwrap();
-        let mut current = parent_node.adj_node();
-
-        // Follow failure links from parent until we find one with outgoing edge_char
-        while let Some(Link(_, target_id)) = current {
-            let current_node = self.get_node(*target_id).unwrap();
-
-            // Try to follow edge_char from this node
-            if let Some(nid) = follow_links!(current_node.next_nodes(), edge_char).next() {
-                // Check if this target would be redundant
-                if let Some(parent_adj) = parent_adj_id {
-                    let parent_adj_node = self.get_node(parent_adj).unwrap();
-                    let is_redundant = follow_links!(parent_adj_node.next_nodes(), edge_char)
-                        .any(|adj_nid| adj_nid == nid);
-
-                    if !is_redundant {
-                        // Found non-redundant suffix
-                        return Some(nid);
-                    }
-                    // Otherwise continue searching for shorter suffix
-                } else {
-                    // Parent has no adj, so this is not redundant
-                    return Some(nid);
-                }
-            }
-
-            // Not found, follow this node's failure link
-            current = current_node.adj_node();
-        }
-
-        // Last resort: check if root has this edge
-        if let Some(nid) = follow_links!(self.root_node().next_nodes(), edge_char).next() {
-            // Check redundancy with parent's adj
-            if let Some(parent_adj) = parent_adj_id {
-                let parent_adj_node = self.get_node(parent_adj).unwrap();
-                let is_redundant = follow_links!(parent_adj_node.next_nodes(), edge_char)
-                    .any(|adj_nid| adj_nid == nid);
-
-                if !is_redundant {
-                    return Some(nid);
-                }
-            } else {
-                return Some(nid);
-            }
-        }
-
-        None
-    }
-
     /// Compute the failure / adjacent links for the prefix tree.
     ///
     /// This will add only the "search suffix links". These are the links that will actually
@@ -272,23 +219,44 @@ impl TrieRoot {
 
         // Process each node in BFS order
         while let Some((parent_id, current_id, edge_char)) = queue.pop_front() {
-            // Get parent's adj link if it exists
-            let parent_node = self.get_node(parent_id)?;
-            let parent_adj_id = parent_node.adj_node().map(|Link(_, nid)| *nid);
-
-            // Find failure link target for current node (non-redundant)
-            let failure_target = self.find_failure_target(parent_id, edge_char, parent_adj_id);
-
-            // Add adj link if one was found
-            if let Some(target_id) = failure_target {
-                self.add_link(current_id, target_id, edge_char, true)?;
+            // Push children to queue
+            let curr_node = self.get_node(current_id)?;
+            for Link(c, nid) in curr_node.next_nodes() {
+                queue.push_back((current_id, *nid, *c));
             }
 
-            // Add children of current node to queue
-            let current_node = self.get_node(current_id)?;
-            for link in current_node.next_nodes() {
-                let Link(c, child_id) = link;
-                queue.push_back((current_id, *child_id, *c));
+            // Level 1 failure nodes point to root
+            if parent_id == self.root_node_id() {
+                self.add_link(current_id, parent_id, edge_char, true)?;
+                continue;
+            }
+
+            let parent = self.get_node(parent_id)?;
+            let mut check_id = *match parent.adj_node() {
+                Some(Link(_, nid)) => nid,
+                _ => return Err(SearchError::MissingLink(parent_id)),
+            };
+            let mut check = self.get_node(check_id)?;
+            loop {
+                match check.follow_link(edge_char) {
+                    Some(Link(c, nid)) => {
+                        // Found the node
+                        self.add_link(current_id, *nid, *c, true)?;
+                        break;
+                    }
+                    None => {
+                        // No node found
+                        if check_id == self.root_node_id() {
+                            self.add_link(current_id, check_id, edge_char, true)?;
+                            break;
+                        } else if let Some(Link(_, nid)) = check.adj_node() {
+                            check_id = *nid;
+                            check = self.get_node(check_id)?;
+                        } else {
+                            return Err(SearchError::MissingLink(check_id));
+                        }
+                    }
+                }
             }
         }
 
@@ -467,6 +435,7 @@ mod tests {
         let ab_node = dbg!(pt.node_by_path("ab").unwrap());
         let b_node = dbg!(pt.node_by_path("b").unwrap());
         let c_node = dbg!(pt.node_by_path("c").unwrap());
+        let cd_node = dbg!(pt.node_by_path("cd").unwrap());
         let bc_node = dbg!(pt.node_by_path("bc").unwrap());
         let abc_node = dbg!(pt.node_by_path("abc").unwrap());
         let bcd_node = dbg!(pt.node_by_path("bcd").unwrap());
@@ -478,14 +447,16 @@ mod tests {
             panic!("Expected an adjacent node!")
         }
 
-        // bcd -> none
-        if let Some(_) = pt.get_node(bcd_node).unwrap().adj_node() {
-            panic!("Did not expect an adjacent node for 'bcd'");
+        // bcd -> cd
+        if let Some(Link(_, nid)) = pt.get_node(bcd_node).unwrap().adj_node() {
+            assert_eq!(*nid, cd_node);
+        } else {
+            panic!("Expected an adjacent node!")
         }
 
-        // abc -> c
+        // abc -> bc
         if let Some(Link(_, nid)) = pt.get_node(abc_node).unwrap().adj_node() {
-            assert_eq!(*nid, c_node);
+            assert_eq!(*nid, bc_node);
         } else {
             panic!("Expected an adjacent node!")
         }
@@ -493,6 +464,20 @@ mod tests {
         // ab -> b
         if let Some(Link(_, nid)) = pt.get_node(ab_node).unwrap().adj_node() {
             assert_eq!(*nid, b_node);
+        } else {
+            panic!("Expected an adjacent node!")
+        }
+
+        // b -> root
+        if let Some(Link(_, nid)) = pt.get_node(b_node).unwrap().adj_node() {
+            assert_eq!(*nid, pt.root_node_id());
+        } else {
+            panic!("Expected an adjacent node!")
+        }
+
+        // cd -> root
+        if let Some(Link(_, nid)) = pt.get_node(cd_node).unwrap().adj_node() {
+            assert_eq!(*nid, pt.root_node_id());
         } else {
             panic!("Expected an adjacent node!")
         }
@@ -505,7 +490,7 @@ mod tests {
             String::from("ab"),
             String::from("bab"),
             String::from("bca"),
-            String::from("caa"),
+            String::from("ca"),
             String::from("bc"),
         ])
         .unwrap();
@@ -518,7 +503,6 @@ mod tests {
         let ba_node = dbg!(pt.node_by_path("ba").unwrap());
         let bc_node = dbg!(pt.node_by_path("bc").unwrap());
         let ca_node = dbg!(pt.node_by_path("ca").unwrap());
-        let caa_node = dbg!(pt.node_by_path("caa").unwrap());
         let bca_node = dbg!(pt.node_by_path("bca").unwrap());
         let bab_node = dbg!(pt.node_by_path("bab").unwrap());
 
@@ -550,23 +534,18 @@ mod tests {
             panic!("Expected an adjacent node!")
         }
 
-        // caa -> a
-        if let Some(Link(_, nid)) = pt.get_node(caa_node).unwrap().adj_node() {
-            assert_eq!(*nid, a_node);
-        } else {
-            panic!("Expected an adjacent node!")
-        }
-
-        // bca -> a
+        // bca -> ca
         if let Some(Link(_, nid)) = pt.get_node(bca_node).unwrap().adj_node() {
-            assert_eq!(*nid, a_node);
+            assert_eq!(*nid, ca_node);
         } else {
             panic!("Expected an adjacent node!")
         }
 
-        // bab -> none
-        if let Some(_) = dbg!(pt.get_node(bab_node).unwrap().adj_node()) {
-            panic!("Expected no adjacent node for 'bab'!");
+        // bab -> ab
+        if let Some(Link(_, nid)) = pt.get_node(bab_node).unwrap().adj_node() {
+            assert_eq!(*nid, ab_node);
+        } else {
+            panic!("Expected an adjacent node!")
         }
     }
 
