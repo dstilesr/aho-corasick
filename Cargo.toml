@@ -4,12 +4,12 @@ version = "0.1.0"
 edition = "2024"
 
 [lib]
-name = "aho_corasick"
+name = "ah_search_rs"
 path = "src/lib.rs"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-pyo3 = "0.27.2"
+pyo3 = {version = "0.27.2", features = ["experimental-inspect"]}
 
 [dev-dependencies]
 rand = "0.9.2"

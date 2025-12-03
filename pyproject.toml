@@ -1,5 +1,5 @@
 [project]
-name = "aho-corasick"
+name = "ah-search"
 version = "0.1.0"
 description = "Aho Corasick algorithm for efficient text searches - implemented in Rust!"
 readme = "README.md"
@@ -8,5 +8,14 @@ dependencies = []
 
 [dependency-groups]
 dev = [
-    "maturin>=1.10.2,<2",
+    "maturin>=1.10.2",
+    "pytest>=9.0.1",
 ]
+
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[tool.maturin]
+module-name = "ah_search.ah_search_rs"
+generate-stubs = true

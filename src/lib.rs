@@ -1,4 +1,7 @@
+mod py_bind;
 pub mod trie;
+
+pub use py_bind::aho_corasick_search;
 
 /// Macro to get an iterator over the  node Ids of a links vector whose links
 /// match the given character. If no character is given, skips the filter step.

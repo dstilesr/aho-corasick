@@ -9,6 +9,8 @@ target/
 **/venv/
 **/__pycache__/
 **/.ipynb_checkpoints/
+**/*.so
+**/*.whl
 
 build
 dist
