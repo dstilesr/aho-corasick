@@ -3,3 +3,20 @@ target/
 
 # Mac OS
 **/.DS_Store
+
+# Python
+**/.venv/
+**/venv/
+**/__pycache__/
+**/.ipynb_checkpoints/
+
+build
+dist
+*.egg-info*
+
+# Envs
+**/*.env
+
+# IDE
+.idea/
+.vscode/
