@@ -1,7 +1,8 @@
 use std::cmp::Ordering;
-use std::collections::VecDeque;
 
-use super::{Link, Node, NodeId, SearchResult, TrieRoot, follow_links};
+use crate::trie::SearchError;
+
+use super::{Link, Node, SearchResult, TrieRoot};
 
 /// Represents a match found in a text
 #[derive(PartialEq, Eq, Debug)]
@@ -43,100 +44,68 @@ impl Ord for Match {
 }
 
 impl TrieRoot {
-    /// Update the lists of active nodes and matches upon feeding a new character.
-    fn update_node_list(
-        &self,
-        active_nodes: &mut VecDeque<NodeId>,
-        matches: &mut Vec<Match>,
-        idx: usize,
-        c: char,
-    ) -> SearchResult<()> {
-        let active_total = active_nodes.len();
-        for _ in 0..active_total {
-            let curr_node = self.get_node(active_nodes.pop_front().unwrap())?;
-
-            // Add current node if it is a full match
-            if let Node::DictNode {
-                value,
-                nxt: _,
-                adj: _,
-            } = curr_node
-            {
-                matches.push(Match::new(value.clone(), idx));
-            }
-
-            for follow in follow_links!(curr_node.next_nodes(), c) {
-                active_nodes.push_back(follow);
-
-                // Add adjacent nodes as well
-                let nxt_node = self.get_node(follow)?;
-                if let Some(Link(_, nid)) = nxt_node.adj_node() {
-                    active_nodes.push_back(*nid);
-                }
-            }
-        }
-        Ok(())
-    }
-
     /// Find all matches for the search dictionary in the given text.
     pub fn find_text_matches(&self, text: &str) -> SearchResult<Vec<Match>> {
-        let mut active: VecDeque<NodeId> = VecDeque::with_capacity(self.total_nodes());
         let mut matches: Vec<Match> = Vec::new();
+        let root_id = self.root_node_id();
 
-        // Initialize
-        active.push_back(self.root_node_id());
+        let mut current_id = root_id;
+        let mut current = self.root_node();
 
-        let mut idx = 0;
-        for c in text.chars() {
-            self.update_node_list(&mut active, &mut matches, idx, c)?;
-
-            // Add root node
-            active.push_back(self.root_node_id());
-            idx += 1;
-        }
-
-        // Final update with remaining dictionary nodes after text end
-        for nid in active {
-            if let Node::DictNode {
-                value,
-                nxt: _,
-                adj: _,
-            } = self.get_node(nid)?
+        for (idx, ch) in text.chars().enumerate() {
+            // Follow failure links until root or node with link corresponding to ch
+            while current_id != root_id
+                && let None = current.follow_link(ch)
             {
-                matches.push(Match::new(value.clone(), idx))
+                current_id = match current.adj_node() {
+                    Some(Link(_, nid)) => *nid,
+                    None => return Err(SearchError::MissingLink(current_id)),
+                };
+                current = self.get_node(current_id)?;
+
+                // Check if matches are found
+                let mut check_id = current_id;
+                while check_id != root_id {
+                    let check_node = self.get_node(check_id)?;
+                    if let Node::DictNode {
+                        value,
+                        nxt: _,
+                        adj: _,
+                    } = check_node
+                    {
+                        matches.push(Match::new(value.clone(), idx + 1));
+                    }
+                    check_id = match check_node.adj_node() {
+                        Some(Link(_, nid)) => *nid,
+                        None => return Err(SearchError::MissingLink(current_id)),
+                    };
+                }
+            }
+
+            if let Some(Link(_, nid)) = current.follow_link(ch) {
+                current_id = *nid;
+                current = self.get_node(current_id)?;
             }
         }
+
         Ok(matches)
     }
 }
 
 #[cfg(test)]
 mod tests {
+
+    use super::super::create_prefix_tree;
     use super::*;
 
-    /// Make a sample tree for the dictionary {ab, abc, cd} (built manually)
+    /// Make a sample tree for the dictionary {ab, abc, cd}
     fn sample_tree_1() -> TrieRoot {
-        let mut trie = TrieRoot::new();
-
-        // Add nodes
-        let a_node_id = trie.add_node(Node::new(None));
-        let b_node_id = trie.add_node(Node::new(Some(String::from("ab"))));
-        let c_node_id = trie.add_node(Node::new(Some(String::from("abc"))));
-        let c_mid_node_id = trie.add_node(Node::new(None));
-        let d_node_id = trie.add_node(Node::new(Some(String::from("cd"))));
-
-        // Links
-        trie.add_link(trie.root_node_id(), a_node_id, 'a', false)
-            .unwrap();
-        trie.add_link(trie.root_node_id(), c_mid_node_id, 'c', false)
-            .unwrap();
-
-        trie.add_link(a_node_id, b_node_id, 'b', false).unwrap();
-        trie.add_link(b_node_id, c_node_id, 'c', false).unwrap();
-        trie.add_link(c_node_id, c_mid_node_id, 'c', true).unwrap();
-
-        trie.add_link(c_mid_node_id, d_node_id, 'd', false).unwrap();
-        trie
+        create_prefix_tree(vec![
+            String::from("ab"),
+            String::from("abc"),
+            String::from("cd"),
+        ])
+        .unwrap()
     }
 
     #[test]
