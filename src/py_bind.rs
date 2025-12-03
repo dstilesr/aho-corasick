@@ -21,20 +21,77 @@ fn map_error_py(err: SearchError) -> PyErr {
     }
 }
 
+/// A Match found in a text. This contains the start character, end character, and the
+/// string value of the match.
+#[pyclass]
+pub struct PyMatch {
+    pub value: String,
+    pub from_char: usize,
+    pub to_char: usize,
+}
+
+impl From<&Match> for PyMatch {
+    /// Convert a Match object from the Rust API into a PyMatch object to be used
+    /// in the Python API
+    fn from(m: &Match) -> Self {
+        let (start, end) = m.char_range();
+        let value = m.value().clone();
+        Self {
+            value: value,
+            from_char: start,
+            to_char: end,
+        }
+    }
+}
+
+#[pymethods]
+impl PyMatch {
+    /// Initialize a new match given the start and end of its character range, and the
+    /// string value.
+    #[new]
+    #[pyo3(signature = (start: "int", end: "int", value: "str"))]
+    pub fn new(start: usize, end: usize, value: String) -> PyResult<Self> {
+        if start >= end {
+            return Err(PyErr::new::<py_errs::PyValueError, _>(
+                "Start must precede end of match!",
+            ));
+        } else if end - start != value.chars().count() {
+            return Err(PyErr::new::<py_errs::PyValueError, _>(
+                "Range length must match total characters in value!",
+            ));
+        }
+
+        Ok(Self {
+            from_char: start,
+            to_char: end,
+            value: value,
+        })
+    }
+
+    pub fn __repr__(&self) -> String {
+        format!(
+            "PyMatch(start={}, end={}, value=\"{}\")",
+            self.from_char,
+            self.to_char,
+            self.value.replace('"', "[QUOT]")
+        )
+    }
+}
+
 /// Search for all occurences of strings in the "dictionary" in the given "haystack".
 ///
 /// The dictionary must be a list of non-empty strings. It is usually better to process
 /// texts in batch if you are using the same dictionary, since this requires only one
 /// instantiation of the prefix tree.
 #[pyfunction]
-#[pyo3(signature = (dictionary: "list[str]", haystack: "str") -> "list[str]")]
-fn search_in_text(dictionary: Vec<String>, haystack: String) -> PyResult<Vec<String>> {
+#[pyo3(signature = (dictionary: "list[str]", haystack: "str") -> "list[PyMatch]")]
+fn search_in_text(dictionary: Vec<String>, haystack: String) -> PyResult<Vec<PyMatch>> {
     let prefix_tree = create_prefix_tree(dictionary).map_err(map_error_py)?;
     let matches = prefix_tree
         .find_text_matches(&haystack)
         .map_err(map_error_py)?;
 
-    Ok(matches.iter().map(|m| m.value().to_string()).collect())
+    Ok(matches.iter().map(PyMatch::from).collect())
 }
 
 /// Search for all occurences of strings in the "dictionary" in the given "haystack" strings.
@@ -44,13 +101,13 @@ fn search_in_text(dictionary: Vec<String>, haystack: String) -> PyResult<Vec<Str
 /// be instantiated multiple times.
 #[pyfunction]
 #[pyo3(signature = (dictionary: "list[str]", haystacks: "list[str]") -> "list[list[str]]")]
-fn search_in_texts(dictionary: Vec<String>, haystacks: Vec<String>) -> PyResult<Vec<Vec<String>>> {
+fn search_in_texts(dictionary: Vec<String>, haystacks: Vec<String>) -> PyResult<Vec<Vec<PyMatch>>> {
     let prefix_tree = create_prefix_tree(dictionary).map_err(map_error_py)?;
     let mut matches_list = Vec::with_capacity(haystacks.len());
 
     for h in &haystacks {
         let matches = prefix_tree.find_text_matches(h).map_err(map_error_py)?;
-        matches_list.push(matches.iter().map(|m| m.value().to_string()).collect());
+        matches_list.push(matches.iter().map(PyMatch::from).collect());
     }
 
     Ok(matches_list)
@@ -61,5 +118,5 @@ fn search_in_texts(dictionary: Vec<String>, haystacks: Vec<String>) -> PyResult<
 pub mod aho_corasick_search {
 
     #[pymodule_export]
-    use super::{search_in_text, search_in_texts};
+    use super::{PyMatch, search_in_text, search_in_texts};
 }
