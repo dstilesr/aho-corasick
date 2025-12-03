@@ -25,8 +25,13 @@ fn map_error_py(err: SearchError) -> PyErr {
 /// string value of the match.
 #[pyclass]
 pub struct PyMatch {
+    #[pyo3(get)]
     pub value: String,
+
+    #[pyo3(get)]
     pub from_char: usize,
+
+    #[pyo3(get)]
     pub to_char: usize,
 }
 
