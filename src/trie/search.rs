@@ -7,9 +7,9 @@ use super::{Link, Node, SearchResult, TrieRoot};
 /// Represents a match found in a text
 #[derive(PartialEq, Eq, Debug)]
 pub struct Match {
-    pub start: usize,
-    pub end: usize,
-    pub value: String,
+    start: usize,
+    end: usize,
+    value: String,
 }
 
 impl Match {
@@ -20,6 +20,16 @@ impl Match {
             end: end_pos,
             value,
         }
+    }
+
+    /// Return the value stored in the match.
+    pub fn value(&self) -> &String {
+        &self.value
+    }
+
+    /// Return the range of characters the match spans.
+    pub fn char_range(&self) -> (usize, usize) {
+        (self.start, self.end)
     }
 }
 
@@ -62,7 +72,9 @@ impl TrieRoot {
     /// let haystack = String::from("This is a string with some nonsense to check: abbaaCxa bCdbCxbb");
     /// let matches = search_tree.find_text_matches(&haystack).unwrap();
     ///
-    /// for Match{start, end, value} in matches {
+    /// for m in matches {
+    ///    let value: &str =  m.value();
+    ///    let (start, end) = m.char_range();
     ///    println!("Found matching string '{value}' in characters {start}-{end}");
     /// }
     /// ```
