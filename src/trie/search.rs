@@ -7,9 +7,9 @@ use super::{Link, Node, SearchResult, TrieRoot};
 /// Represents a match found in a text
 #[derive(PartialEq, Eq, Debug)]
 pub struct Match {
-    start: usize,
-    end: usize,
-    value: String,
+    pub start: usize,
+    pub end: usize,
+    pub value: String,
 }
 
 impl Match {
@@ -45,6 +45,27 @@ impl Ord for Match {
 
 impl TrieRoot {
     /// Find all matches for the search dictionary in the given text.
+    ///
+    /// Example:
+    /// ```rust
+    /// use aho_corasick::trie::{self, Match};
+    ///
+    /// let search_dictionary = vec![
+    ///     String::from("a"),
+    ///     String::from("abb"),
+    ///     String::from("bb"),
+    ///     String::from("bCd"),
+    ///     String::from("bCx"),
+    ///     String::from("Cxaabb"),
+    /// ];
+    /// let search_tree = trie::create_prefix_tree(search_dictionary).unwrap();
+    /// let haystack = String::from("This is a string with some nonsense to check: abbaaCxa bCdbCxbb");
+    /// let matches = search_tree.find_text_matches(&haystack).unwrap();
+    ///
+    /// for Match{start, end, value} in matches {
+    ///    println!("Found matching string '{value}' in characters {start}-{end}");
+    /// }
+    /// ```
     pub fn find_text_matches(&self, text: &str) -> SearchResult<Vec<Match>> {
         let mut matches: Vec<Match> = Vec::new();
         let root_id = self.root_node_id();
