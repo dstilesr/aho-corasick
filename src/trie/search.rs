@@ -49,42 +49,49 @@ impl TrieRoot {
         let mut matches: Vec<Match> = Vec::new();
         let root_id = self.root_node_id();
 
-        let mut current_id = root_id;
+        let mut curr_id = root_id;
         let mut current = self.root_node();
 
         for (idx, ch) in text.chars().enumerate() {
-            // Follow failure links until root or node with link corresponding to ch
-            while current_id != root_id
+            // Node does not have link with the required char - try failovers
+            // until node found or root reached
+            while curr_id != root_id
                 && let None = current.follow_link(ch)
             {
-                current_id = match current.adj_node() {
-                    Some(Link(_, nid)) => *nid,
-                    None => return Err(SearchError::MissingLink(current_id)),
-                };
-                current = self.get_node(current_id)?;
-
-                // Check if matches are found
-                let mut check_id = current_id;
-                while check_id != root_id {
-                    let check_node = self.get_node(check_id)?;
-                    if let Node::DictNode {
-                        value,
-                        nxt: _,
-                        adj: _,
-                    } = check_node
-                    {
-                        matches.push(Match::new(value.clone(), idx + 1));
+                match current.adj_node() {
+                    None => return Err(SearchError::MissingLink(curr_id)),
+                    Some(Link(_, nid)) => {
+                        curr_id = *nid;
+                        current = self.get_node(*nid)?;
                     }
-                    check_id = match check_node.adj_node() {
-                        Some(Link(_, nid)) => *nid,
-                        None => return Err(SearchError::MissingLink(current_id)),
-                    };
                 }
             }
 
+            // Move to node if edge available. Now we are at a node with the
+            // right last character or at root.
             if let Some(Link(_, nid)) = current.follow_link(ch) {
-                current_id = *nid;
-                current = self.get_node(current_id)?;
+                curr_id = *nid;
+                current = self.get_node(*nid)?;
+            }
+
+            // Check for matches
+            let mut check_id = curr_id;
+            while check_id != root_id {
+                let check = self.get_node(check_id)?;
+                if let Node::DictNode {
+                    value,
+                    nxt: _,
+                    adj: _,
+                } = check
+                {
+                    matches.push(Match::new(value.clone(), idx + 1));
+                }
+                match check.adj_node() {
+                    None => return Err(SearchError::MissingLink(check_id)),
+                    Some(Link(_, nid)) => {
+                        check_id = *nid;
+                    }
+                }
             }
         }
 
