@@ -1,4 +1,6 @@
+#[cfg(feature = "python_bind")]
 mod py_bind;
+
 pub mod trie;
 
 /// Macro to get an iterator over the  node Ids of a links vector whose links

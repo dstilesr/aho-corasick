@@ -9,8 +9,12 @@ path = "src/lib.rs"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-pyo3 = {version = "0.27.2", features = ["experimental-inspect"]}
+pyo3 = {version = "0.27.2", features = ["experimental-inspect"], optional = true}
 
 [dev-dependencies]
 rand = "0.9.2"
 rand_distr = "0.5.1"
+
+[features]
+default = []
+python_bind = ["dep:pyo3"]
