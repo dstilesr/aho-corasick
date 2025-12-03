@@ -19,3 +19,4 @@ build-backend = "maturin"
 [tool.maturin]
 module-name = "ah_search.ah_search_rs"
 generate-stubs = true
+python-source = "python-src"
