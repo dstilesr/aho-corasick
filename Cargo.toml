@@ -6,8 +6,10 @@ edition = "2024"
 [lib]
 name = "aho_corasick"
 path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+pyo3 = "0.27.2"
 
 [dev-dependencies]
 rand = "0.9.2"
