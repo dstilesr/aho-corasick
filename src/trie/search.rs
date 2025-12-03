@@ -104,6 +104,7 @@ mod tests {
 
     use super::super::create_prefix_tree;
     use super::*;
+    use rand::{Rng, distr::Alphanumeric};
 
     /// Make a sample tree for the dictionary {ab, abc, cd}
     fn sample_tree_1() -> TrieRoot {
@@ -113,6 +114,14 @@ mod tests {
             String::from("cd"),
         ])
         .unwrap()
+    }
+
+    /// Generate a random alphanumeric string of the given length (in bytes)
+    fn random_string(length: usize) -> String {
+        let mut rng = rand::rng();
+        (0..length)
+            .map(|_| rng.sample(Alphanumeric) as char)
+            .collect()
     }
 
     #[test]
@@ -149,5 +158,35 @@ mod tests {
         let sample = "123 x, y aBcD wXyAb dc";
         let matches = dbg!(pref_tree.find_text_matches(sample).unwrap());
         assert!(matches.is_empty());
+    }
+
+    #[test]
+    fn test_search_random_string() {
+        let haystack = random_string(8192);
+        let haystack_chars: Vec<char> = haystack.chars().collect();
+
+        let pt = create_prefix_tree(vec![
+            String::from("a"),
+            String::from("b"),
+            String::from("aB"),
+            String::from("bcd"),
+            String::from("abcd"),
+            String::from("AbcdaB"),
+            String::from("0"),
+            String::from("0bcd"),
+            String::from("a0b"),
+        ])
+        .unwrap();
+
+        let mut matches = pt.find_text_matches(&haystack).unwrap();
+        matches.sort();
+        assert!(dbg!(matches.len()) > 0);
+
+        for Match { start, end, value } in &matches {
+            assert_eq!(*end - *start, value.len());
+
+            let val_chars: Vec<char> = value.chars().collect();
+            assert_eq!(&val_chars, &haystack_chars[*start..*end]);
+        }
     }
 }
