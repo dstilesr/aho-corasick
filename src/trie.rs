@@ -290,7 +290,7 @@ impl TrieRoot {
 ///
 /// Examples
 /// ```rust
-/// use aho_corasick::trie;
+/// use ah_search_rs::trie;
 ///
 /// let my_dictionary = vec![String::from("abc"), String::from("ab"), String::from("cd")];
 /// let prefix_tree = trie::create_prefix_tree(my_dictionary).unwrap();

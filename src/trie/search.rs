@@ -58,7 +58,7 @@ impl TrieRoot {
     ///
     /// Example:
     /// ```rust
-    /// use aho_corasick::trie::{self, Match};
+    /// use ah_search_rs::trie::{self, Match};
     ///
     /// let search_dictionary = vec![
     ///     String::from("a"),
