@@ -623,4 +623,49 @@ mod tests {
         );
         res.unwrap();
     }
+
+    #[test]
+    fn test_create_case_insensitive() {
+        let pt = create_prefix_tree(
+            vec![
+                String::from("abc"),
+                String::from("xY"),
+                String::from("Xyz"),
+                String::from("AB"),
+            ],
+            Some(SearchOptions {
+                case_sensitive: false,
+                check_bounds: false,
+            }),
+        )
+        .unwrap();
+
+        assert_eq!(pt.total_nodes(), 7);
+        let mut total_dct = 0;
+        for node in pt.nodes {
+            if let Node::DictNode {
+                value,
+                nxt: _,
+                adj: _,
+            } = node
+            {
+                total_dct += 1;
+                assert_eq!(value, value.to_lowercase());
+            }
+        }
+        assert_eq!(total_dct, 4);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_initialization_case_insensitive_duplicate() {
+        let res = create_prefix_tree(
+            vec![String::from("abc"), String::from("xy"), String::from("aBc")],
+            Some(SearchOptions {
+                case_sensitive: false,
+                check_bounds: false,
+            }),
+        );
+        res.unwrap();
+    }
 }
