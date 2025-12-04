@@ -91,9 +91,9 @@ impl PyMatch {
 #[pyfunction]
 #[pyo3(signature = (dictionary: "list[str]", haystack: "str") -> "list[PyMatch]")]
 fn search_in_text(dictionary: Vec<String>, haystack: String) -> PyResult<Vec<PyMatch>> {
-    let prefix_tree = create_prefix_tree(dictionary).map_err(map_error_py)?;
+    let prefix_tree = create_prefix_tree(dictionary, None).map_err(map_error_py)?;
     let matches = prefix_tree
-        .find_text_matches(&haystack)
+        .find_text_matches(haystack)
         .map_err(map_error_py)?;
 
     Ok(matches.iter().map(PyMatch::from).collect())
@@ -107,10 +107,10 @@ fn search_in_text(dictionary: Vec<String>, haystack: String) -> PyResult<Vec<PyM
 #[pyfunction]
 #[pyo3(signature = (dictionary: "list[str]", haystacks: "list[str]") -> "list[list[str]]")]
 fn search_in_texts(dictionary: Vec<String>, haystacks: Vec<String>) -> PyResult<Vec<Vec<PyMatch>>> {
-    let prefix_tree = create_prefix_tree(dictionary).map_err(map_error_py)?;
+    let prefix_tree = create_prefix_tree(dictionary, None).map_err(map_error_py)?;
     let mut matches_list = Vec::with_capacity(haystacks.len());
 
-    for h in &haystacks {
+    for h in haystacks {
         let matches = prefix_tree.find_text_matches(h).map_err(map_error_py)?;
         matches_list.push(matches.iter().map(PyMatch::from).collect());
     }

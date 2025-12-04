@@ -68,9 +68,9 @@ impl TrieRoot {
     ///     String::from("bCx"),
     ///     String::from("Cxaabb"),
     /// ];
-    /// let search_tree = trie::create_prefix_tree(search_dictionary).unwrap();
+    /// let search_tree = trie::create_prefix_tree(search_dictionary, None).unwrap();
     /// let haystack = String::from("This is a string with some nonsense to check: abbaaCxa bCdbCxbb");
-    /// let matches = search_tree.find_text_matches(&haystack).unwrap();
+    /// let matches = search_tree.find_text_matches(haystack).unwrap();
     ///
     /// for m in matches {
     ///    let value: &str =  m.value();
@@ -78,7 +78,11 @@ impl TrieRoot {
     ///    println!("Found matching string '{value}' in characters {start}-{end}");
     /// }
     /// ```
-    pub fn find_text_matches(&self, text: &str) -> SearchResult<Vec<Match>> {
+    pub fn find_text_matches(&self, mut text: String) -> SearchResult<Vec<Match>> {
+        if !self.options.case_sensitive {
+            text = text.to_lowercase();
+        };
+
         let mut matches: Vec<Match> = Vec::new();
         let root_id = self.root_node_id();
 
@@ -141,11 +145,10 @@ mod tests {
 
     /// Make a sample tree for the dictionary {ab, abc, cd}
     fn sample_tree_1() -> TrieRoot {
-        create_prefix_tree(vec![
-            String::from("ab"),
-            String::from("abc"),
-            String::from("cd"),
-        ])
+        create_prefix_tree(
+            vec![String::from("ab"), String::from("abc"), String::from("cd")],
+            None,
+        )
         .unwrap()
     }
 
@@ -162,7 +165,7 @@ mod tests {
         let pref_tree = sample_tree_1();
         let sample = "123 a ab c d cd bc abc";
 
-        let mut matches = dbg!(pref_tree.find_text_matches(sample).unwrap());
+        let mut matches = dbg!(pref_tree.find_text_matches(sample.to_string()).unwrap());
         matches.sort();
         // Expect 4 matches
         assert_eq!(matches.len(), 4);
@@ -189,7 +192,7 @@ mod tests {
     fn test_search_no_matches() {
         let pref_tree = sample_tree_1();
         let sample = "123 x, y aBcD wXyAb dc";
-        let matches = dbg!(pref_tree.find_text_matches(sample).unwrap());
+        let matches = dbg!(pref_tree.find_text_matches(sample.to_string()).unwrap());
         assert!(matches.is_empty());
     }
 
@@ -198,20 +201,23 @@ mod tests {
         let haystack = random_string(8192);
         let haystack_chars: Vec<char> = haystack.chars().collect();
 
-        let pt = create_prefix_tree(vec![
-            String::from("a"),
-            String::from("b"),
-            String::from("aB"),
-            String::from("bcd"),
-            String::from("abcd"),
-            String::from("AbcdaB"),
-            String::from("0"),
-            String::from("0bcd"),
-            String::from("a0b"),
-        ])
+        let pt = create_prefix_tree(
+            vec![
+                String::from("a"),
+                String::from("b"),
+                String::from("aB"),
+                String::from("bcd"),
+                String::from("abcd"),
+                String::from("AbcdaB"),
+                String::from("0"),
+                String::from("0bcd"),
+                String::from("a0b"),
+            ],
+            None,
+        )
         .unwrap();
 
-        let mut matches = pt.find_text_matches(&haystack).unwrap();
+        let mut matches = pt.find_text_matches(haystack).unwrap();
         matches.sort();
         assert!(dbg!(matches.len()) > 0);
 

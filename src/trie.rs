@@ -4,20 +4,40 @@ use std::collections::VecDeque;
 use super::follow_links;
 pub use search::*;
 
+/// Type alias to reference the ID of a node in the prefix tree.
+pub type NodeId = usize;
+
+/// Errors that can be raised by the library functions
 #[derive(Debug, PartialEq, Eq)]
 pub enum SearchError {
-    InvalidNodeId(usize),
+    InvalidNodeId(NodeId),
     DuplicateNode,
     InvalidDictionary,
-    MissingLink(usize),
+    MissingLink(NodeId),
 }
 
+/// Result type for this library
 pub type SearchResult<T> = Result<T, SearchError>;
-pub type NodeId = usize;
 
 /// A link between two nodes in the prefix tree
 #[derive(Debug)]
 pub struct Link(char, NodeId);
+
+/// Options to use when performing searches
+pub struct SearchOptions {
+    pub case_sensitive: bool,
+    pub check_bounds: bool,
+}
+
+impl Default for SearchOptions {
+    /// Default oprions: case sensitive search without checking word boundaries.
+    fn default() -> Self {
+        SearchOptions {
+            case_sensitive: true,
+            check_bounds: false,
+        }
+    }
+}
 
 /// Represents a node in the prefix tree for the Aho-Corasick structure
 #[derive(Debug)]
@@ -111,14 +131,16 @@ impl Node {
 /// Represents the root of the Aho-Corasick prefix tree
 pub struct TrieRoot {
     nodes: Vec<Node>,
+    options: SearchOptions,
 }
 
 impl TrieRoot {
     /// Instantiate a new, empty prefix tree
-    pub fn new() -> Self {
+    pub fn new(options: SearchOptions) -> Self {
         Self {
             // Add root node
             nodes: vec![Node::new(None)],
+            options,
         }
     }
 
@@ -293,13 +315,28 @@ impl TrieRoot {
 /// use ah_search_rs::trie;
 ///
 /// let my_dictionary = vec![String::from("abc"), String::from("ab"), String::from("cd")];
-/// let prefix_tree = trie::create_prefix_tree(my_dictionary).unwrap();
+/// let prefix_tree = trie::create_prefix_tree(my_dictionary, None).unwrap();
+///
+/// // Use non-default options
+/// let my_dictionary = vec![String::from("abc"), String::from("ab"), String::from("cd")];
+/// let opts = trie::SearchOptions{case_sensitive: false, check_bounds: true};
+/// let prefix_tree = trie::create_prefix_tree(my_dictionary, Some(opts)).unwrap();
 /// ```
-pub fn create_prefix_tree(mut dictionary: Vec<String>) -> SearchResult<TrieRoot> {
+pub fn create_prefix_tree(
+    mut dictionary: Vec<String>,
+    opts: Option<SearchOptions>,
+) -> SearchResult<TrieRoot> {
     if dictionary.is_empty() {
         return Err(SearchError::InvalidDictionary);
     }
 
+    let opts_obj = opts.unwrap_or_else(Default::default);
+    if !opts_obj.case_sensitive {
+        // Case insensitive - convert all dictionary elements to lowercase
+        for i in 0..dictionary.len() {
+            dictionary[i] = dictionary[i].to_lowercase();
+        }
+    }
     dictionary.sort();
 
     // Validate dictionary
@@ -311,7 +348,7 @@ pub fn create_prefix_tree(mut dictionary: Vec<String>) -> SearchResult<TrieRoot>
         }
     }
 
-    let mut pt = TrieRoot::new();
+    let mut pt = TrieRoot::new(opts_obj);
     for item in dictionary {
         pt.add_pattern(item).unwrap();
     }
@@ -326,7 +363,7 @@ mod tests {
     #[test]
     fn test_initialization() {
         let dictionary = vec![String::from("ab"), String::from("abc"), String::from("cd")];
-        let pt = create_prefix_tree(dictionary).unwrap();
+        let pt = create_prefix_tree(dictionary, None).unwrap();
 
         // Verify root node properties
         assert!(pt.root_node().adj_node().is_none());
@@ -369,13 +406,16 @@ mod tests {
 
     #[test]
     fn test_node_by_path() {
-        let pt = create_prefix_tree(vec![
-            String::from("ab"),
-            String::from("abc"),
-            String::from("bcd"),
-            String::from("cd"),
-            String::from("cb"),
-        ])
+        let pt = create_prefix_tree(
+            vec![
+                String::from("ab"),
+                String::from("abc"),
+                String::from("bcd"),
+                String::from("cd"),
+                String::from("cb"),
+            ],
+            None,
+        )
         .unwrap();
 
         // Check 'ab' node
@@ -423,12 +463,15 @@ mod tests {
 
     #[test]
     fn test_adj_links() {
-        let pt = create_prefix_tree(vec![
-            String::from("ab"),
-            String::from("abc"),
-            String::from("bcd"),
-            String::from("cd"),
-        ])
+        let pt = create_prefix_tree(
+            vec![
+                String::from("ab"),
+                String::from("abc"),
+                String::from("bcd"),
+                String::from("cd"),
+            ],
+            None,
+        )
         .unwrap();
 
         assert_eq!(pt.root_node().next_nodes().len(), 3);
@@ -485,14 +528,17 @@ mod tests {
 
     #[test]
     fn test_adj_links_medium() {
-        let pt = create_prefix_tree(vec![
-            String::from("a"),
-            String::from("ab"),
-            String::from("bab"),
-            String::from("bca"),
-            String::from("ca"),
-            String::from("bc"),
-        ])
+        let pt = create_prefix_tree(
+            vec![
+                String::from("a"),
+                String::from("ab"),
+                String::from("bab"),
+                String::from("bca"),
+                String::from("ca"),
+                String::from("bc"),
+            ],
+            None,
+        )
         .unwrap();
 
         let a_node = dbg!(pt.node_by_path("a").unwrap());
@@ -552,26 +598,29 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_initialization_empty_str() {
-        let res = create_prefix_tree(vec![String::from("abc"), String::from("")]);
+        let res = create_prefix_tree(vec![String::from("abc"), String::from("")], None);
         res.unwrap();
     }
 
     #[test]
     #[should_panic]
     fn test_initialization_empty_dct() {
-        let res = create_prefix_tree(Vec::new());
+        let res = create_prefix_tree(Vec::new(), None);
         res.unwrap();
     }
 
     #[test]
     #[should_panic]
     fn test_initialization_duplicate() {
-        let res = create_prefix_tree(vec![
-            String::from("abc"),
-            String::from("xy"),
-            String::from("abc"),
-            String::from("opq"),
-        ]);
+        let res = create_prefix_tree(
+            vec![
+                String::from("abc"),
+                String::from("xy"),
+                String::from("abc"),
+                String::from("opq"),
+            ],
+            None,
+        );
         res.unwrap();
     }
 }
