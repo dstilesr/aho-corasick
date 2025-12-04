@@ -26,3 +26,6 @@ dist
 # UV
 uv.lock
 .python-version
+
+# Pytest
+.pytest_cache

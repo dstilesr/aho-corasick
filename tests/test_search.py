@@ -68,6 +68,8 @@ def test_search_multiple():
 
     for match in m3:
         assert texts[2][match.from_char : match.to_char] == match.value
+        assert match.value in dct
 
     for match in m1:
         assert texts[0][match.from_char : match.to_char] == match.value
+        assert match.value in dct
