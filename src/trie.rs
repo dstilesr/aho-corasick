@@ -24,6 +24,7 @@ pub type SearchResult<T> = Result<T, SearchError>;
 pub struct Link(char, NodeId);
 
 /// Options to use when performing searches
+#[derive(Debug)]
 pub struct SearchOptions {
     pub case_sensitive: bool,
     pub check_bounds: bool,

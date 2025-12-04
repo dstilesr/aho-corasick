@@ -1,7 +1,67 @@
 # Aho Corasick Library
 
 ## About
+
+### Overview
 This is a string search library that uses the Aho-Corasick algorithm to find occurences of the strings in the given dictionary in a given text. The library can be used in Rust, and it also has Python bindings.
+
+### Usage Examples
+
+Usage example in Rust:
+```rust
+use ah_search_rs::trie;
+
+// Dictionary of strings to find in a text
+let dictionary = vec![
+    String::from("find"),
+    String::from("these"),
+    String::from("fun"),
+    String::from("words"),
+];
+
+// Override default options - otherwise provide None
+let options = Some(trie::SearchOptions{
+    // Case insensitive search: convert dictionary and text to lowercase before proceeding
+    case_sensitive: false,
+
+    // Do not require word boundaries around the matches
+    check_bounds: false,
+});
+
+let haystack = String::from("Finding words in these texts is a lot of fun!");
+
+let prefix_tree = trie::create_prefix_tree(dictionary, options).unwrap();
+let matches = prefix_tree.find_text_matches(haystack.clone());
+
+for m in matches {
+    let (start, end) = m.char_range();
+    println!(
+        "Found a match - Text: {}, from char: {}, to char: {}",
+        m.value(),
+        start,
+        end,
+    );
+}
+```
+
+Usage example in Python
+```python
+import ah_search as acs
+
+dictionary = ["find", "these", "fun", "words"]
+haystack = "finding words in these texts is a lot of fun!"
+
+# TODO: Other options to be added soon...
+for match in acs.search_in_text(dictionary, haystack):
+    print(
+        "Found a match - Text: '%s', from char: %d, to char: %d"
+        % (
+            match.value,
+            match.from_char,
+            match.to_char,
+        )
+    )
+```
 
 ## Environment Setup
 To set up your environment for development, you must have the Rust development tools (the Rust compiler and `cargo`) installed on your machine. Next, set up a python virtual environment with the python version you want to build for with `uv`, and install the development dependencies: `uv sync --all-groups`.
