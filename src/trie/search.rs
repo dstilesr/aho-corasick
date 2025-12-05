@@ -134,13 +134,7 @@ impl TrieRoot {
             let mut check_id = curr_id;
             while check_id != root_id {
                 let check = self.get_node(check_id)?;
-                if let Node::DictNode {
-                    value,
-                    nxt: _,
-                    adj: _,
-                    keyword,
-                } = check
-                {
+                if let Node::DictNode { value, keyword, .. } = check {
                     matches.push(Match::new(value.clone(), keyword.clone(), idx + 1));
                 }
                 match check.adj_node() {

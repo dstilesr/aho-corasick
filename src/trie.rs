@@ -86,19 +86,11 @@ impl Node {
     /// links list. Otherwise, it is added to the next links list.
     fn add_link(&mut self, link: Link, adjacent: bool) {
         match self {
-            Node::DictNode {
-                value: _,
-                nxt,
-                adj,
-                keyword: _,
-            } => {
+            Node::DictNode { nxt, adj, .. } => {
                 if adjacent {
                     adj.replace(link);
                 } else {
                     nxt.push(link);
-
-                    // Keep this sorted for binary search
-                    nxt.sort();
                 }
             }
             Node::MedNode { nxt, adj } => {
@@ -106,9 +98,6 @@ impl Node {
                     adj.replace(link);
                 } else {
                     nxt.push(link);
-
-                    // Keep this sorted for binary search
-                    nxt.sort();
                 }
             }
         }
@@ -117,26 +106,16 @@ impl Node {
     /// Get the vector of following nodes
     pub fn next_nodes(&self) -> &Vec<Link> {
         match self {
-            Node::DictNode {
-                value: _,
-                nxt,
-                adj: _,
-                keyword: _,
-            } => nxt,
-            Node::MedNode { nxt, adj: _ } => nxt,
+            Node::DictNode { nxt, .. } => nxt,
+            Node::MedNode { nxt, .. } => nxt,
         }
     }
 
     /// Get adjacent (failure) link of this node
     pub fn adj_node(&self) -> Option<&Link> {
         let out = match self {
-            Node::DictNode {
-                value: _,
-                nxt: _,
-                adj,
-                keyword: _,
-            } => adj,
-            Node::MedNode { nxt: _, adj } => adj,
+            Node::DictNode { adj, .. } => adj,
+            Node::MedNode { adj, .. } => adj,
         };
         out.as_ref()
     }
@@ -164,8 +143,9 @@ pub struct TrieRoot {
 }
 
 impl TrieRoot {
-    /// Instantiate a new, empty prefix tree
-    pub fn new(options: SearchOptions) -> Self {
+    /// Instantiate a new, empty prefix tree. This should not be called directly, use
+    /// create_prefix_tree function instead.
+    fn new(options: SearchOptions) -> Self {
         Self {
             // Add root node
             nodes: vec![Node::new(None, None)],
@@ -331,6 +311,18 @@ impl TrieRoot {
         }
         Some(current)
     }
+
+    /// Sort the lists of next links for all the nodes in the tree. This should be called just
+    /// once when initializing.
+    fn finalize_links(&mut self) {
+        for node in &mut self.nodes {
+            match node {
+                Node::DictNode { nxt, .. } | Node::MedNode { nxt, .. } => {
+                    nxt.sort();
+                }
+            }
+        }
+    }
 }
 
 /// Given a vector of strings, return a vector of (pattern, keyword).
@@ -410,6 +402,7 @@ pub fn create_prefix_tree(
         pt.add_pattern(pattern, keyword).unwrap();
     }
     pt.compute_failure_links()?;
+    pt.finalize_links();
     Ok(pt)
 }
 
@@ -448,13 +441,7 @@ mod tests {
         // Count dictionary nodes
         let mut dct_vals = Vec::new();
         for node in pt.nodes {
-            if let Node::DictNode {
-                value,
-                nxt: _,
-                adj: _,
-                keyword: _,
-            } = node
-            {
+            if let Node::DictNode { value, .. } = node {
                 dct_vals.push(value.clone());
             }
         }
@@ -484,12 +471,7 @@ mod tests {
         let ab_node = pt.get_node(pt.node_by_path("ab").unwrap()).unwrap();
         let ab_nxt = match ab_node {
             Node::MedNode { nxt: _, adj: _ } => panic!("Expected a dictionary node"),
-            Node::DictNode {
-                value,
-                nxt,
-                adj: _,
-                keyword: _,
-            } => {
+            Node::DictNode { value, nxt, .. } => {
                 assert_eq!("ab", value);
                 nxt
             }
@@ -501,13 +483,8 @@ mod tests {
         // Check 'c' node
         let c_node = pt.get_node(pt.node_by_path("c").unwrap()).unwrap();
         let c_nxt = match c_node {
-            Node::MedNode { nxt, adj: _ } => nxt,
-            Node::DictNode {
-                value: _,
-                nxt: _,
-                adj: _,
-                keyword: _,
-            } => panic!("Expected intermediate node"),
+            Node::MedNode { nxt, .. } => nxt,
+            Node::DictNode { .. } => panic!("Expected intermediate node"),
         };
         assert_eq!(c_nxt.len(), 2);
         let mut chars: Vec<char> = c_nxt.iter().map(|Link(c, _)| *c).collect();
@@ -714,13 +691,7 @@ mod tests {
         assert_eq!(pt.total_nodes(), 7);
         let mut total_dct = 0;
         for node in pt.nodes {
-            if let Node::DictNode {
-                value,
-                nxt: _,
-                adj: _,
-                keyword: _,
-            } = node
-            {
+            if let Node::DictNode { value, .. } = node {
                 total_dct += 1;
                 assert_eq!(value, value.to_lowercase());
             }
