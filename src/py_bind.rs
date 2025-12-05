@@ -29,6 +29,9 @@ pub struct PyMatch {
     pub value: String,
 
     #[pyo3(get)]
+    pub kw: String,
+
+    #[pyo3(get)]
     pub from_char: usize,
 
     #[pyo3(get)]
@@ -40,9 +43,9 @@ impl From<&Match> for PyMatch {
     /// in the Python API
     fn from(m: &Match) -> Self {
         let (start, end) = m.char_range();
-        let value = m.value().clone();
         Self {
-            value: value,
+            value: m.value().clone(),
+            kw: m.keyword().clone(),
             from_char: start,
             to_char: end,
         }
@@ -54,8 +57,8 @@ impl PyMatch {
     /// Initialize a new match given the start and end of its character range, and the
     /// string value.
     #[new]
-    #[pyo3(signature = (start: "int", end: "int", value: "str"))]
-    pub fn new(start: usize, end: usize, value: String) -> PyResult<Self> {
+    #[pyo3(signature = (start: "int", end: "int", value: "str", keyword: "str"))]
+    pub fn new(start: usize, end: usize, value: String, keyword: String) -> PyResult<Self> {
         if start >= end {
             return Err(PyErr::new::<py_errs::PyValueError, _>(
                 "Start must precede end of match!",
@@ -70,15 +73,17 @@ impl PyMatch {
             from_char: start,
             to_char: end,
             value: value,
+            kw: keyword,
         })
     }
 
     pub fn __repr__(&self) -> String {
         format!(
-            "PyMatch(start={}, end={}, value=\"{}\")",
+            "PyMatch(start={}, end={}, value=\"{}\", keyword=\"{}\")",
             self.from_char,
             self.to_char,
-            self.value.replace('"', "[QUOT]")
+            self.value.replace('"', "[QUOT]"),
+            self.kw.replace('"', "[QUOT]"),
         )
     }
 }
@@ -99,7 +104,9 @@ fn search_in_text(
         case_sensitive,
         check_bounds: false,
     };
-    let prefix_tree = create_prefix_tree(dictionary, Some(opts)).map_err(map_error_py)?;
+    // TODO -Receive python dictionary
+    let prefix_tree =
+        create_prefix_tree(add_keyword_slot(dictionary), Some(opts)).map_err(map_error_py)?;
     let matches = prefix_tree
         .find_text_matches(haystack)
         .map_err(map_error_py)?;
@@ -123,7 +130,9 @@ fn search_in_texts(
         case_sensitive,
         check_bounds: false,
     };
-    let prefix_tree = create_prefix_tree(dictionary, Some(opts)).map_err(map_error_py)?;
+    // TODO -Receive python dictionary
+    let prefix_tree =
+        create_prefix_tree(add_keyword_slot(dictionary), Some(opts)).map_err(map_error_py)?;
     let mut matches_list = Vec::with_capacity(haystacks.len());
 
     for h in haystacks {

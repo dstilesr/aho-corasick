@@ -4,20 +4,34 @@ use crate::trie::SearchError;
 
 use super::{Link, Node, SearchResult, TrieRoot};
 
-/// Represents a match found in a text
+/// Represents a match found in a text.
+///
+/// The match contains the index of the start and end characters of the match, so that
+/// `haystack_chars[start:end]` should be equal to the character vector of the "value". Note
+/// that matches are done on a character level, not a byte level, so indexing the string directly
+/// may not yield the expected result.
 #[derive(PartialEq, Eq, Debug)]
 pub struct Match {
+    /// Index of first character in the match
     start: usize,
+
+    /// 1 + index of last character in the match
     end: usize,
+
+    /// The match value substring that was actually found
     value: String,
+
+    /// The corresponding keyword / standard form of the match
+    kw: String,
 }
 
 impl Match {
     /// Instantiate a new match from a value and 1 + index of the last character in the match.
-    pub fn new(value: String, end_pos: usize) -> Self {
+    pub fn new(value: String, kw: String, end_pos: usize) -> Self {
         Self {
             start: end_pos - value.chars().count(),
             end: end_pos,
+            kw,
             value,
         }
     }
@@ -25,6 +39,11 @@ impl Match {
     /// Return the value stored in the match.
     pub fn value(&self) -> &String {
         &self.value
+    }
+
+    /// Return the value of the associated keyword of the match
+    pub fn keyword(&self) -> &String {
+        &self.kw
     }
 
     /// Return the range of characters the match spans.
@@ -60,14 +79,14 @@ impl TrieRoot {
     /// ```rust
     /// use ah_search_rs::trie::{self, Match};
     ///
-    /// let search_dictionary = vec![
+    /// let search_dictionary = trie::add_keyword_slot(vec![
     ///     String::from("a"),
     ///     String::from("abb"),
     ///     String::from("bb"),
     ///     String::from("bCd"),
     ///     String::from("bCx"),
     ///     String::from("Cxaabb"),
-    /// ];
+    /// ]);
     /// let search_tree = trie::create_prefix_tree(search_dictionary, None).unwrap();
     /// let haystack = String::from("This is a string with some nonsense to check: abbaaCxa bCdbCxbb");
     /// let matches = search_tree.find_text_matches(haystack).unwrap();
@@ -119,9 +138,10 @@ impl TrieRoot {
                     value,
                     nxt: _,
                     adj: _,
+                    keyword,
                 } = check
                 {
-                    matches.push(Match::new(value.clone(), idx + 1));
+                    matches.push(Match::new(value.clone(), keyword.clone(), idx + 1));
                 }
                 match check.adj_node() {
                     None => return Err(SearchError::MissingLink(check_id)),
@@ -139,14 +159,18 @@ impl TrieRoot {
 #[cfg(test)]
 mod tests {
 
-    use super::super::create_prefix_tree;
+    use super::super::{add_keyword_slot, create_prefix_tree};
     use super::*;
     use rand::{Rng, distr::Alphanumeric};
 
     /// Make a sample tree for the dictionary {ab, abc, cd}
     fn sample_tree_1() -> TrieRoot {
         create_prefix_tree(
-            vec![String::from("ab"), String::from("abc"), String::from("cd")],
+            add_keyword_slot(vec![
+                String::from("ab"),
+                String::from("abc"),
+                String::from("cd"),
+            ]),
             None,
         )
         .unwrap()
@@ -202,7 +226,7 @@ mod tests {
         let haystack_chars: Vec<char> = haystack.chars().collect();
 
         let pt = create_prefix_tree(
-            vec![
+            add_keyword_slot(vec![
                 String::from("a"),
                 String::from("b"),
                 String::from("aB"),
@@ -212,7 +236,7 @@ mod tests {
                 String::from("0"),
                 String::from("0bcd"),
                 String::from("a0b"),
-            ],
+            ]),
             None,
         )
         .unwrap();
@@ -221,11 +245,53 @@ mod tests {
         matches.sort();
         assert!(dbg!(matches.len()) > 0);
 
-        for Match { start, end, value } in &matches {
+        for Match {
+            start,
+            end,
+            value,
+            kw: _,
+        } in &matches
+        {
             assert_eq!(*end - *start, value.len());
 
             let val_chars: Vec<char> = value.chars().collect();
             assert_eq!(&val_chars, &haystack_chars[*start..*end]);
         }
+    }
+
+    #[test]
+    fn test_search_keywords() {
+        let dct = vec![
+            (String::from("abc"), None),
+            (String::from("ac"), Some(String::from("abc"))),
+            (String::from("ABC"), Some(String::from("abc"))),
+            (String::from("acq"), Some(String::from("abc"))),
+        ];
+        let pt = create_prefix_tree(dct, None).unwrap();
+        let matches = dbg!(pt.find_text_matches(String::from("abq dc ac ABCac pqracq"))).unwrap();
+
+        assert_eq!(matches.len(), 5);
+        for m in matches {
+            assert_eq!(m.keyword(), "abc")
+        }
+
+        let dct = vec![
+            (String::from("abc"), None),
+            (String::from("ab"), Some(String::from("ab"))),
+            (String::from("ABC"), Some(String::from("abc"))),
+            (String::from("acq"), Some(String::from("ab"))),
+        ];
+        let pt = create_prefix_tree(dct, None).unwrap();
+        let matches = dbg!(pt.find_text_matches(String::from("abq dc ac ABCac pqracq"))).unwrap();
+        assert_eq!(matches.len(), 3);
+
+        assert_eq!(matches[0].value(), "ab");
+        assert_eq!(matches[0].keyword(), "ab");
+
+        assert_eq!(matches[1].value(), "ABC");
+        assert_eq!(matches[1].keyword(), "abc");
+
+        assert_eq!(matches[2].value(), "acq");
+        assert_eq!(matches[2].keyword(), "ab");
     }
 }

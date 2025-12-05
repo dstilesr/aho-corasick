@@ -46,6 +46,7 @@ pub enum Node {
     /// Dictionary nodes represent a complete pattern. When these nodes are reached, a match has been found.
     DictNode {
         value: String,
+        keyword: String,
         nxt: Vec<Link>,
         adj: Option<Link>,
     },
@@ -57,13 +58,24 @@ pub enum Node {
 impl Node {
     /// Instantiate a new node to add to the prefix tree. If a value is provided, a DictNode will
     /// be instantiated with that value. Otherwise, a MedNode will be created.
-    pub fn new(value: Option<String>) -> Self {
+    ///
+    /// Example
+    /// ```rust
+    /// use ah_search_rs::trie::Node;
+    ///
+    /// let node_1 = Node::new(Some(String::from("variant")), Some(String::from("Standard Variant")));
+    ///
+    /// // Keyword equal to the value to match
+    /// let node_2 = Node::new(Some(String::from("pattern")), None);
+    /// ```
+    pub fn new(value: Option<String>, keyword: Option<String>) -> Self {
         match value {
             None => Self::MedNode {
                 nxt: Vec::new(),
                 adj: None,
             },
             Some(s) => Self::DictNode {
+                keyword: keyword.unwrap_or_else(|| s.clone()),
                 value: s,
                 nxt: Vec::new(),
                 adj: None,
@@ -75,7 +87,12 @@ impl Node {
     /// links list. Otherwise, it is added to the next links list.
     fn add_link(&mut self, link: Link, adjacent: bool) {
         match self {
-            Node::DictNode { value: _, nxt, adj } => {
+            Node::DictNode {
+                value: _,
+                nxt,
+                adj,
+                keyword: _,
+            } => {
                 if adjacent {
                     adj.replace(link);
                 } else {
@@ -99,6 +116,7 @@ impl Node {
                 value: _,
                 nxt,
                 adj: _,
+                keyword: _,
             } => nxt,
             Node::MedNode { nxt, adj: _ } => nxt,
         }
@@ -111,6 +129,7 @@ impl Node {
                 value: _,
                 nxt: _,
                 adj,
+                keyword: _,
             } => adj,
             Node::MedNode { nxt: _, adj } => adj,
         };
@@ -140,7 +159,7 @@ impl TrieRoot {
     pub fn new(options: SearchOptions) -> Self {
         Self {
             // Add root node
-            nodes: vec![Node::new(None)],
+            nodes: vec![Node::new(None, None)],
             options,
         }
     }
@@ -195,29 +214,21 @@ impl TrieRoot {
     /// their corresponding "following" links. Adjacent or "failure" links must be added
     /// separately by calling the "compute_failure_links" function. This is only meant to
     /// be used during creation of the trie structure.
-    fn add_pattern(&mut self, new_item: String) -> SearchResult<()> {
+    fn add_pattern(&mut self, new_item: String, kw: Option<String>) -> SearchResult<()> {
         let mut current_id = self.root_node_id();
         let characters: Vec<char> = new_item.chars().collect();
 
         for (i, c) in characters.iter().enumerate() {
-            let next_nodes = match self.get_node(current_id)? {
-                Node::DictNode {
-                    value: _,
-                    nxt,
-                    adj: _,
-                } => nxt,
-                Node::MedNode { nxt, adj: _ } => nxt,
-            };
-            match follow_links!(next_nodes, *c).next() {
-                Some(nid) => current_id = nid,
+            match self.get_node(current_id)?.follow_link(*c) {
+                Some(Link(_, nid)) => current_id = *nid,
                 None => {
                     // Next node not already present - add it to the trie
-                    let val = if i == characters.len() - 1 {
-                        Some(new_item.clone())
+                    let (val, key) = if i == characters.len() - 1 {
+                        (Some(new_item.clone()), kw.clone())
                     } else {
-                        None
+                        (None, None)
                     };
-                    let node_id = self.add_node(Node::new(val));
+                    let node_id = self.add_node(Node::new(val, key));
                     self.add_link(current_id, node_id, *c, false)?;
 
                     current_id = node_id;
@@ -308,6 +319,20 @@ impl TrieRoot {
     }
 }
 
+/// Given a vector of strings, return a vector of (pattern, keyword).
+///
+/// This instantiates the new vector by adding a None keyword to each element.
+/// This will make a vector that can be used to instantiate the prefix tree.
+pub fn add_keyword_slot(patterns: Vec<String>) -> Vec<(String, Option<String>)> {
+    let mut new = Vec::with_capacity(patterns.len());
+
+    for val in patterns {
+        new.push((val, None));
+    }
+
+    new
+}
+
 /// Instantiate a prefix tree for search from the given dictionary (list of strings). Returns
 /// an error if the dictionary is empty or contains empty strings or duplicates.
 ///
@@ -315,16 +340,32 @@ impl TrieRoot {
 /// ```rust
 /// use ah_search_rs::trie;
 ///
-/// let my_dictionary = vec![String::from("abc"), String::from("ab"), String::from("cd")];
+/// let my_dictionary = trie::add_keyword_slot(vec![
+///     String::from("abc"),
+///     String::from("ab"),
+///     String::from("cd"),
+/// ]);
 /// let prefix_tree = trie::create_prefix_tree(my_dictionary, None).unwrap();
 ///
 /// // Use non-default options
-/// let my_dictionary = vec![String::from("abc"), String::from("ab"), String::from("cd")];
+/// let my_dictionary = trie::add_keyword_slot(vec![
+///     String::from("abc"),
+///     String::from("ab"),
+///     String::from("cd"),
+/// ]);
 /// let opts = trie::SearchOptions{case_sensitive: false, check_bounds: true};
 /// let prefix_tree = trie::create_prefix_tree(my_dictionary, Some(opts)).unwrap();
+///
+/// // With keywords and variants to match different patterns to "Python"
+/// let my_dictionary = vec![
+///     (String::from("Python"), None),
+///     (String::from("Python3"), Some(String::from("Python"))),
+///     (String::from("PythonLang"), Some(String::from("Python"))),
+/// ];
+/// let prefix_tree = trie::create_prefix_tree(my_dictionary, None).unwrap();
 /// ```
 pub fn create_prefix_tree(
-    mut dictionary: Vec<String>,
+    mut dictionary: Vec<(String, Option<String>)>,
     opts: Option<SearchOptions>,
 ) -> SearchResult<TrieRoot> {
     if dictionary.is_empty() {
@@ -335,23 +376,24 @@ pub fn create_prefix_tree(
     if !opts_obj.case_sensitive {
         // Case insensitive - convert all dictionary elements to lowercase
         for i in 0..dictionary.len() {
-            dictionary[i] = dictionary[i].to_lowercase();
+            let (pat, kw) = &dictionary[i];
+            dictionary[i] = (pat.to_lowercase(), kw.clone());
         }
     }
     dictionary.sort();
 
-    // Validate dictionary
+    // Validate dictionary - no duplicate patterns
     for (item, next) in dictionary.iter().zip(&dictionary[1..]) {
-        if item == next {
+        if item.0 == next.0 {
             return Err(SearchError::DuplicateNode);
-        } else if item == "" || next == "" {
+        } else if item.0 == "" || next.0 == "" {
             return Err(SearchError::InvalidDictionary);
         }
     }
 
     let mut pt = TrieRoot::new(opts_obj);
-    for item in dictionary {
-        pt.add_pattern(item).unwrap();
+    for (pattern, keyword) in dictionary {
+        pt.add_pattern(pattern, keyword).unwrap();
     }
     pt.compute_failure_links()?;
     Ok(pt)
@@ -363,7 +405,11 @@ mod tests {
 
     #[test]
     fn test_initialization() {
-        let dictionary = vec![String::from("ab"), String::from("abc"), String::from("cd")];
+        let dictionary = add_keyword_slot(vec![
+            String::from("ab"),
+            String::from("abc"),
+            String::from("cd"),
+        ]);
         let pt = create_prefix_tree(dictionary, None).unwrap();
 
         // Verify root node properties
@@ -392,6 +438,7 @@ mod tests {
                 value,
                 nxt: _,
                 adj: _,
+                keyword: _,
             } = node
             {
                 dct_vals.push(value.clone());
@@ -408,13 +455,13 @@ mod tests {
     #[test]
     fn test_node_by_path() {
         let pt = create_prefix_tree(
-            vec![
+            add_keyword_slot(vec![
                 String::from("ab"),
                 String::from("abc"),
                 String::from("bcd"),
                 String::from("cd"),
                 String::from("cb"),
-            ],
+            ]),
             None,
         )
         .unwrap();
@@ -423,7 +470,12 @@ mod tests {
         let ab_node = pt.get_node(pt.node_by_path("ab").unwrap()).unwrap();
         let ab_nxt = match ab_node {
             Node::MedNode { nxt: _, adj: _ } => panic!("Expected a dictionary node"),
-            Node::DictNode { value, nxt, adj: _ } => {
+            Node::DictNode {
+                value,
+                nxt,
+                adj: _,
+                keyword: _,
+            } => {
                 assert_eq!("ab", value);
                 nxt
             }
@@ -440,6 +492,7 @@ mod tests {
                 value: _,
                 nxt: _,
                 adj: _,
+                keyword: _,
             } => panic!("Expected intermediate node"),
         };
         assert_eq!(c_nxt.len(), 2);
@@ -465,12 +518,12 @@ mod tests {
     #[test]
     fn test_adj_links() {
         let pt = create_prefix_tree(
-            vec![
+            add_keyword_slot(vec![
                 String::from("ab"),
                 String::from("abc"),
                 String::from("bcd"),
                 String::from("cd"),
-            ],
+            ]),
             None,
         )
         .unwrap();
@@ -530,14 +583,14 @@ mod tests {
     #[test]
     fn test_adj_links_medium() {
         let pt = create_prefix_tree(
-            vec![
+            add_keyword_slot(vec![
                 String::from("a"),
                 String::from("ab"),
                 String::from("bab"),
                 String::from("bca"),
                 String::from("ca"),
                 String::from("bc"),
-            ],
+            ]),
             None,
         )
         .unwrap();
@@ -599,7 +652,10 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_initialization_empty_str() {
-        let res = create_prefix_tree(vec![String::from("abc"), String::from("")], None);
+        let res = create_prefix_tree(
+            add_keyword_slot(vec![String::from("abc"), String::from("")]),
+            None,
+        );
         res.unwrap();
     }
 
@@ -614,12 +670,12 @@ mod tests {
     #[should_panic]
     fn test_initialization_duplicate() {
         let res = create_prefix_tree(
-            vec![
+            add_keyword_slot(vec![
                 String::from("abc"),
                 String::from("xy"),
                 String::from("abc"),
                 String::from("opq"),
-            ],
+            ]),
             None,
         );
         res.unwrap();
@@ -628,12 +684,12 @@ mod tests {
     #[test]
     fn test_create_case_insensitive() {
         let pt = create_prefix_tree(
-            vec![
+            add_keyword_slot(vec![
                 String::from("abc"),
                 String::from("xY"),
                 String::from("Xyz"),
                 String::from("AB"),
-            ],
+            ]),
             Some(SearchOptions {
                 case_sensitive: false,
                 check_bounds: false,
@@ -648,6 +704,7 @@ mod tests {
                 value,
                 nxt: _,
                 adj: _,
+                keyword: _,
             } = node
             {
                 total_dct += 1;
@@ -661,12 +718,47 @@ mod tests {
     #[should_panic]
     fn test_initialization_case_insensitive_duplicate() {
         let res = create_prefix_tree(
-            vec![String::from("abc"), String::from("xy"), String::from("aBc")],
+            add_keyword_slot(vec![
+                String::from("abc"),
+                String::from("xy"),
+                String::from("aBc"),
+            ]),
             Some(SearchOptions {
                 case_sensitive: false,
                 check_bounds: false,
             }),
         );
         res.unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_instantiate_keywords_duplicate() {
+        let dct = vec![
+            (String::from("abc"), Some(String::from("Abc"))),
+            (String::from("ABC"), Some(String::from("Acd"))),
+            (String::from("aBc"), Some(String::from("ABC"))),
+            (String::from("abc"), Some(String::from("def"))),
+        ];
+        create_prefix_tree(dct, None).unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_instantiate_keywords_duplicate_case_insensitive() {
+        let dct = vec![
+            (String::from("abc"), Some(String::from("Abc"))),
+            (String::from("def"), Some(String::from("Def"))),
+            (String::from("gHI"), Some(String::from("Ghi"))),
+            (String::from("ABC"), Some(String::from("Abc"))),
+        ];
+        create_prefix_tree(
+            dct,
+            Some(SearchOptions {
+                case_sensitive: false,
+                check_bounds: false,
+            }),
+        )
+        .unwrap();
     }
 }
