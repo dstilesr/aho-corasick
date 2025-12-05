@@ -8,8 +8,8 @@ dependencies = []
 
 [dependency-groups]
 dev = [
-    "maturin>=1.10.2",
-    "pytest>=9.0.1",
+    "maturin>=1.10.2,<2",
+    "pytest>=9.0.1,<10",
 ]
 
 [build-system]
