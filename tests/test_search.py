@@ -2,6 +2,7 @@ import pytest
 from ah_search import (
     PyMatch,
     PyTrie,
+    normalize_string,
     search_in_text,
     search_in_texts,
     to_dictionary,
@@ -130,3 +131,24 @@ def test_search_trie_obj_case_insensitive():
     matches = trie.search(haystack)
 
     assert len(matches) == 4, "Expected 4 matches (case insensitive)"
+
+
+def test_search_word_bounds():
+    """
+    Test that searching works with word boundary checking enabled.
+    """
+    dct = {"ab": "ab", "abc": "ab", "épq": "epq", "épqr": "epq"}
+    trie = PyTrie(dct, case_sensitive=True, check_bounds=True)
+
+    hs1 = normalize_string("abco zab épqrst! -épqo")
+    matches = trie.search(hs1)
+    assert len(matches) == 0
+
+    hs2 = normalize_string("abc :ab épqr! -épq")
+    matches = trie.search(hs2)
+    assert len(matches) == 4
+
+    assert matches[0].kw == "ab" and matches[0].value == "abc"
+    assert matches[1].kw == "ab" and matches[1].value == "ab"
+    assert matches[2].kw == "epq" and matches[2].value == "épqr"
+    assert matches[3].kw == "epq" and matches[3].value == "épq"

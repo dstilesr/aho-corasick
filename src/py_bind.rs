@@ -117,12 +117,16 @@ pub struct PyTrie {
 impl PyTrie {
     /// Instantiate a prefix tree from a mapping of pattern -> keyword
     #[new]
-    #[pyo3(signature = (dictionary: "dict[str, str]", case_sensitive=true))]
-    pub fn new(dictionary: &Bound<'_, PyDict>, case_sensitive: bool) -> PyResult<Self> {
+    #[pyo3(signature = (dictionary: "dict[str, str]", case_sensitive=true, check_bounds=false))]
+    pub fn new(
+        dictionary: &Bound<'_, PyDict>,
+        case_sensitive: bool,
+        check_bounds: bool,
+    ) -> PyResult<Self> {
         let entries = py_dict_to_vector(dictionary)?;
         let opts = Some(SearchOptions {
             case_sensitive,
-            check_bounds: false,
+            check_bounds,
         });
         let trie_inner = create_prefix_tree(entries, opts).map_err(map_error_py)?;
 
@@ -188,15 +192,16 @@ fn py_dict_to_vector(dct: &Bound<'_, PyDict>) -> PyResult<Vec<(String, Option<St
 /// texts in batch if you are using the same dictionary, since this requires only one
 /// instantiation of the prefix tree.
 #[pyfunction]
-#[pyo3(signature = (dictionary: "dict[str, str]", haystack: "str", case_sensitive=true) -> "list[PyMatch]")]
+#[pyo3(signature = (dictionary: "dict[str, str]", haystack: "str", case_sensitive=true, check_bounds=false) -> "list[PyMatch]")]
 fn search_in_text(
     dictionary: &Bound<'_, PyDict>,
     haystack: String,
     case_sensitive: bool,
+    check_bounds: bool,
 ) -> PyResult<Vec<PyMatch>> {
     let opts = SearchOptions {
         case_sensitive,
-        check_bounds: false,
+        check_bounds,
     };
     let prefix_tree =
         create_prefix_tree(py_dict_to_vector(dictionary)?, Some(opts)).map_err(map_error_py)?;
@@ -213,15 +218,16 @@ fn search_in_text(
 /// than calling "search_in_text" individually on each one, since that would require the prefix tree to
 /// be instantiated multiple times.
 #[pyfunction]
-#[pyo3(signature = (dictionary: "dict[str, str]", haystacks: "list[str]", case_sensitive=true) -> "list[list[str]]")]
+#[pyo3(signature = (dictionary: "dict[str, str]", haystacks: "list[str]", case_sensitive=true, check_bounds=false) -> "list[list[str]]")]
 fn search_in_texts(
     dictionary: &Bound<'_, PyDict>,
     haystacks: Vec<String>,
     case_sensitive: bool,
+    check_bounds: bool,
 ) -> PyResult<Vec<Vec<PyMatch>>> {
     let opts = SearchOptions {
         case_sensitive,
-        check_bounds: false,
+        check_bounds,
     };
     let prefix_tree =
         create_prefix_tree(py_dict_to_vector(dictionary)?, Some(opts)).map_err(map_error_py)?;
