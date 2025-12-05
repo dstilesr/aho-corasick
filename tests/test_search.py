@@ -1,5 +1,5 @@
 import pytest
-from ah_search import PyMatch, search_in_text, search_in_texts
+from ah_search import PyMatch, search_in_text, search_in_texts, to_dictionary
 
 
 def test_search_invalid():
@@ -9,21 +9,16 @@ def test_search_invalid():
 
     # Empty dictionary
     with pytest.raises(ValueError) as exc_info:
-        _ = search_in_text([], "this is a bit of text")
+        _ = search_in_text({}, "this is a bit of text")
         assert False, "Searched with empty dictionary"
-
-    assert isinstance(exc_info.value, ValueError)
-
-    # Duplicates in dictionary
-    with pytest.raises(ValueError) as exc_info:
-        _ = search_in_text(["a", "ab", "text", "a"], "this is a bit of text")
-        assert False, "Searched with duplicates in dictionary"
 
     assert isinstance(exc_info.value, ValueError)
 
     # Empty string in dictionary
     with pytest.raises(ValueError) as exc_info:
-        _ = search_in_text(["a", "ab", "", "a"], "this is a bit of text")
+        _ = search_in_text(
+            to_dictionary(["a", "ab", "", "a"]), "this is a bit of text"
+        )
         assert False, "Searched with empty string in dictionary"
 
     assert isinstance(exc_info.value, ValueError)
@@ -35,7 +30,7 @@ def test_search_simple():
     """
 
     matches: list[PyMatch] = search_in_text(
-        ["ab", "abc", "cd", "bcd", "dq"], "abq cdr qpbcd 12abcd"
+        to_dictionary(["ab", "abc", "cd", "bcd", "dq"]), "abq cdr qpbcd 12abcd"
     )
     assert len(matches) == 8, "Expected 8 matches"
 
@@ -60,7 +55,7 @@ def test_search_multiple():
         "xy, tre, 1245, mllmkh, aqqsd",
         "432 bcda plodq",
     ]
-    dct = ["ab", "abc", "cd", "bcd", "dq"]
+    dct = to_dictionary(["ab", "abc", "cd", "bcd", "dq"])
     matches: list[list[PyMatch]] = search_in_texts(dct, texts)
 
     assert len(matches) == len(texts)
@@ -83,8 +78,21 @@ def test_search_case_insensitive():
     """
     Test search with case-insensitive option.
     """
-    dictionary = ["abc", "cde", "erx"]
+    dictionary = to_dictionary(["abc", "cde", "erx"])
     haystack = "ABCDE eRX cDe"
     matches = search_in_text(dictionary, haystack, case_sensitive=False)
 
     assert len(matches) == 4, "Expected 4 matches (case insensitive)"
+
+
+def test_search_case_insensitive_invalid():
+    """
+    Test searching with case insensitive option on an invalid dictionary.
+    """
+    dictionary = {"a": "a", "b": "b", "A": "a"}
+    haystack = "ABCDE eRX cDe"
+    with pytest.raises(ValueError) as exc_info:
+        _ = search_in_text(dictionary, haystack, case_sensitive=False)
+        assert False, "Exception should have been raised"
+
+    assert isinstance(exc_info.value, ValueError)

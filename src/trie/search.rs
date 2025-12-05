@@ -159,6 +159,8 @@ impl TrieRoot {
 #[cfg(test)]
 mod tests {
 
+    use crate::trie::SearchOptions;
+
     use super::super::{add_keyword_slot, create_prefix_tree};
     use super::*;
     use rand::{Rng, distr::Alphanumeric};
@@ -293,5 +295,46 @@ mod tests {
 
         assert_eq!(matches[2].value(), "acq");
         assert_eq!(matches[2].keyword(), "ab");
+    }
+
+    #[test]
+    fn test_search_keywords_uncased() {
+        let dct = vec![
+            (String::from("abc"), Some(String::from("Abc"))),
+            (String::from("ab"), Some(String::from("Ab"))),
+            (String::from("DC"), Some(String::from("Abc"))),
+            (String::from("acq"), Some(String::from("Ab"))),
+        ];
+        let pt = create_prefix_tree(
+            dct,
+            Some(SearchOptions {
+                check_bounds: false,
+                case_sensitive: false,
+            }),
+        )
+        .unwrap();
+        let matches = dbg!(pt.find_text_matches(String::from("aBq dc ABCac pqracQ AbC"))).unwrap();
+        assert_eq!(matches.len(), 7);
+
+        assert_eq!(matches[0].value(), "ab");
+        assert_eq!(matches[0].keyword(), "Ab");
+
+        assert_eq!(matches[1].value(), "dc");
+        assert_eq!(matches[1].keyword(), "Abc");
+
+        assert_eq!(matches[2].value(), "ab");
+        assert_eq!(matches[2].keyword(), "Ab");
+
+        assert_eq!(matches[3].value(), "abc");
+        assert_eq!(matches[3].keyword(), "Abc");
+
+        assert_eq!(matches[4].value(), "acq");
+        assert_eq!(matches[4].keyword(), "Ab");
+
+        assert_eq!(matches[5].value(), "ab");
+        assert_eq!(matches[5].keyword(), "Ab");
+
+        assert_eq!(matches[6].value(), "abc");
+        assert_eq!(matches[6].keyword(), "Abc");
     }
 }
