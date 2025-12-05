@@ -11,6 +11,7 @@ target/
 **/.ipynb_checkpoints/
 **/*.so
 **/*.whl
+**/*.pyc
 
 build
 dist
@@ -29,3 +30,7 @@ uv.lock
 
 # Pytest
 .pytest_cache
+
+# Ruff
+.ruff*
+.ruff_cache

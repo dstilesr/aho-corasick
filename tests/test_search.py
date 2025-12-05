@@ -1,5 +1,11 @@
 import pytest
-from ah_search import PyMatch, search_in_text, search_in_texts, to_dictionary
+from ah_search import (
+    PyMatch,
+    PyTrie,
+    search_in_text,
+    search_in_texts,
+    to_dictionary,
+)
 
 
 def test_search_invalid():
@@ -96,3 +102,31 @@ def test_search_case_insensitive_invalid():
         assert False, "Exception should have been raised"
 
     assert isinstance(exc_info.value, ValueError)
+
+
+def test_search_trie_obj():
+    """
+    Basic search tests using the PyTrie object.
+    """
+    dct = {"abc": "Abc", "ab": "Abc", "bcd": "Bc", "pqr": "Pqr"}
+    kws = set(dct.values())
+    trie = PyTrie(dct)
+
+    hs = "abcd pqr abQd"
+    matches = trie.search(hs)
+
+    assert len(matches) == 5
+    for m in matches:
+        assert m.kw in kws
+
+
+def test_search_trie_obj_case_insensitive():
+    """
+    Basic search tests using the PyTrie object with case insensitive option
+    """
+    trie = PyTrie(to_dictionary(["abc", "cde", "erx"]), case_sensitive=False)
+
+    haystack = "ABCDE eRX cDe"
+    matches = trie.search(haystack)
+
+    assert len(matches) == 4, "Expected 4 matches (case insensitive)"

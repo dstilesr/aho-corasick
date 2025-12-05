@@ -89,6 +89,85 @@ impl PyMatch {
     }
 }
 
+/// Prefix tree for performing string searches.
+///
+/// This is a wrapper around the Rust prefix tree implementation to avoid
+/// recomputing the trie unnecessarily when calling from Python. This wrapper
+/// is essentially immutable once created.
+#[pyclass]
+pub struct PyTrie {
+    /// The Rust implemented Trie that is wrapped
+    trie_inner: TrieRoot,
+
+    /// The list of keywords stored in the trie
+    #[pyo3(get)]
+    keywords: Vec<String>,
+}
+
+#[pymethods]
+impl PyTrie {
+    /// Instantiate a prefix tree from a mapping of pattern -> keyword
+    #[new]
+    #[pyo3(signature = (dictionary: "dict[str, str]", case_sensitive=true))]
+    pub fn new(dictionary: &Bound<'_, PyDict>, case_sensitive: bool) -> PyResult<Self> {
+        let entries = py_dict_to_vector(dictionary)?;
+        let opts = Some(SearchOptions {
+            case_sensitive,
+            check_bounds: false,
+        });
+        let trie_inner = create_prefix_tree(entries, opts).map_err(map_error_py)?;
+
+        let mut keywords = Vec::new();
+        for node in trie_inner.nodes_vec() {
+            if let Node::DictNode {
+                value: _,
+                keyword,
+                nxt: _,
+                adj: _,
+            } = node
+            {
+                keywords.push(keyword.clone());
+            }
+        }
+        Ok(Self {
+            trie_inner,
+            keywords,
+        })
+    }
+
+    /// Return the total number of nodes in the prefix tree
+    pub fn total_nodes(&self) -> usize {
+        self.trie_inner.total_nodes()
+    }
+
+    /// Search for occurrences of the defined patterns in the given text
+    pub fn search(&self, text: String) -> PyResult<Vec<PyMatch>> {
+        let results = self
+            .trie_inner
+            .find_text_matches(text)
+            .map_err(map_error_py)?;
+
+        Ok(results.iter().map(PyMatch::from).collect())
+    }
+
+    /// Search for occurrences in a list of texts
+    pub fn search_many(&self, texts: Vec<String>) -> PyResult<Vec<Vec<PyMatch>>> {
+        let mut results_all = Vec::with_capacity(texts.len());
+        for txt in texts {
+            results_all.push(self.search(txt)?)
+        }
+        Ok(results_all)
+    }
+
+    pub fn __str__(&self) -> String {
+        format!(
+            "PyTrie(keywords={:?}, total_nodes={})",
+            self.keywords,
+            self.total_nodes()
+        )
+    }
+}
+
 /// Convert a dictionary of python str -> str into the vector expected by the Rust API.
 fn py_dict_to_vector(dct: &Bound<'_, PyDict>) -> PyResult<Vec<(String, Option<String>)>> {
     let mut items = Vec::with_capacity(dct.len());
@@ -158,5 +237,5 @@ fn search_in_texts(
 pub mod aho_corasick_search {
 
     #[pymodule_export]
-    use super::{PyMatch, search_in_text, search_in_texts};
+    use super::{PyMatch, PyTrie, search_in_text, search_in_texts};
 }

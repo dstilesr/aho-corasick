@@ -1,5 +1,15 @@
 # Aho Corasick Library
 
+## Table of Contents
+- [About](#about)
+  - [Overview](#overview)
+  - [Usage Examples](#usage-examples)
+    - [Rust Examples](#rust-examples)
+    - [Python Examples](#python-examples)
+- [Environment Setup](#environment-setup)
+- [Installation](#installation)
+- [Unit Tests](#unit-tests)
+
 ## About
 
 ### Overview
@@ -7,17 +17,17 @@ This is a string search library that uses the Aho-Corasick algorithm to find occ
 
 ### Usage Examples
 
-Usage example in Rust:
+#### Rust Examples
 ```rust
 use ah_search_rs::trie;
 
 // Dictionary of strings to find in a text
-let dictionary = vec![
+let dictionary = trie::add_keyword_slot(vec![
     String::from("find"),
     String::from("these"),
     String::from("fun"),
     String::from("words"),
-];
+]);
 
 // Override default options - otherwise provide None
 let options = Some(trie::SearchOptions{
@@ -44,11 +54,13 @@ for m in matches {
 }
 ```
 
-Usage example in Python
+#### Python Examples
+
+**Example Using the Search Functions**
 ```python
 import ah_search as acs
 
-dictionary = ["find", "Ding", "these", "fun", "WORDs"]
+dictionary = acs.to_dictionary(["find", "Ding", "these", "fun", "WORDs"])
 haystack = "Finding words in these texts is a lot of fun!"
 
 # Case-insensitive search
@@ -63,6 +75,36 @@ for match in acs.search_in_text(dictionary, haystack, case_sensitive=False):
     )
 
 # TODO: Other options to be added soon...
+```
+
+**Example Using the Trie Object**
+```python
+import ah_search as acs
+
+dictionary = {
+    "find": "Find",
+    "ding": "Ding",
+    "these": "These",
+    "fun": "Fun",
+    "WORDs": "Words",
+    "words": "Words"
+}
+trie = acs.PyTrie(dictionary, case_sensitive=True)
+print(f"Let's see what we have here: {str(trie)}")
+
+haystack = "Finding words in these texts is a lot of fun!"
+
+
+for match in trie.search(haystack):
+    print(
+        "Found a match - Text: '%s' ('%s'), from char: %d, to char: %d"
+        % (
+            match.value,
+            match.kw,
+            match.from_char,
+            match.to_char,
+        )
+    )
 ```
 
 ## Environment Setup

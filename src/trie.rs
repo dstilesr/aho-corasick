@@ -173,6 +173,11 @@ impl TrieRoot {
         }
     }
 
+    /// Get the vector of nodes
+    pub fn nodes_vec(&self) -> &Vec<Node> {
+        &self.nodes
+    }
+
     /// Get the ID of the root node of the tree
     pub fn root_node_id(&self) -> usize {
         0
