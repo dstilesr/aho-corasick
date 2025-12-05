@@ -55,7 +55,11 @@ def test_search_multiple():
     """
     Test search with a simple dictionary over multiple texts
     """
-    texts = ["abq cdr qpbcd 12abcd", "xy, tre, 1245, mllmkh, aqqsd", "432 bcda plodq"]
+    texts = [
+        "abq cdr qpbcd 12abcd",
+        "xy, tre, 1245, mllmkh, aqqsd",
+        "432 bcda plodq",
+    ]
     dct = ["ab", "abc", "cd", "bcd", "dq"]
     matches: list[list[PyMatch]] = search_in_texts(dct, texts)
 

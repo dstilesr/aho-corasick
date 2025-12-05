@@ -21,6 +21,7 @@ classifiers = [
 dev = [
     "maturin>=1.10.2,<2",
     "pytest>=9.0.1,<10",
+    "ruff==0.14.8",
 ]
 
 [build-system]
@@ -36,3 +37,16 @@ features = ["python_bind"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["python-src"]
+
+[tool.ruff]
+line-length = 80
+exclude = [
+    ".venv",
+    "venv",
+    "**/.ipynb_checkpoints",
+]
+
+[tool.ruff.format]
+quote-style = "double"
+line-ending = "lf"
+indent-style = "space"
