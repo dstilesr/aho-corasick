@@ -1,5 +1,11 @@
 use super::{Link, Node, SearchError, SearchResult, TrieRoot};
 
+/// Return whether the given character is a "word character", i.e. a Unicode
+/// alphanumeric character, a number or an underscore.
+fn is_word_char(c: char) -> bool {
+    c.is_alphanumeric() || c == '_'
+}
+
 /// Represents a match found in a text.
 ///
 /// The match contains the index of the start and end characters of the match, so that
@@ -48,6 +54,14 @@ impl Match {
     }
 }
 
+/// Check if a match is word bounded. That is, check if the preceding and following characters
+/// are not word-characters.
+fn is_word_bounded(m: &Match, range: &Vec<char>) -> bool {
+    let left = m.start == 0 || (!is_word_char(range[m.start - 1]));
+    let right = m.end >= range.len() || (!is_word_char(range[m.end]));
+    left && right
+}
+
 impl TrieRoot {
     /// Find all matches for the search dictionary in the given text.
     ///
@@ -78,17 +92,18 @@ impl TrieRoot {
             text = text.to_lowercase();
         };
 
+        let characters: Vec<char> = text.chars().collect();
         let mut matches: Vec<Match> = Vec::new();
         let root_id = self.root_node_id();
 
         let mut curr_id = root_id;
         let mut current = self.root_node();
 
-        for (idx, ch) in text.chars().enumerate() {
+        for (idx, ch) in characters.iter().enumerate() {
             // Node does not have link with the required char - try failovers
             // until node found or root reached
             while curr_id != root_id
-                && let None = current.follow_link(ch)
+                && let None = current.follow_link(*ch)
             {
                 match current.adj_node() {
                     None => return Err(SearchError::MissingLink(curr_id)),
@@ -101,7 +116,7 @@ impl TrieRoot {
 
             // Move to node if edge available. Now we are at a node with the
             // right last character or at root.
-            if let Some(Link(_, nid)) = current.follow_link(ch) {
+            if let Some(Link(_, nid)) = current.follow_link(*ch) {
                 curr_id = *nid;
                 current = self.get_node(*nid)?;
             }
@@ -111,7 +126,10 @@ impl TrieRoot {
             while check_id != root_id {
                 let check = self.get_node(check_id)?;
                 if let Node::DictNode { value, keyword, .. } = check {
-                    matches.push(Match::new(value.clone(), keyword.clone(), idx + 1));
+                    let m = Match::new(value.clone(), keyword.clone(), idx + 1);
+                    if (!self.options.check_bounds) || is_word_bounded(&m, &characters) {
+                        matches.push(m);
+                    }
                 }
                 match check.adj_node() {
                     None => return Err(SearchError::MissingLink(check_id)),
@@ -128,12 +146,10 @@ impl TrieRoot {
 
 #[cfg(test)]
 mod tests {
-
-    use crate::trie::SearchOptions;
-
-    use super::super::{add_keyword_slot, create_prefix_tree};
+    use super::super::{SearchOptions, add_keyword_slot, create_prefix_tree};
     use super::*;
     use rand::{Rng, distr::Alphanumeric};
+    use unicode_normalization::UnicodeNormalization;
 
     /// Make a sample tree for the dictionary {ab, abc, cd}
     fn sample_tree_1() -> TrieRoot {
@@ -303,5 +319,89 @@ mod tests {
 
         assert_eq!(matches[6].value(), "abc");
         assert_eq!(matches[6].keyword(), "Abc");
+    }
+
+    #[test]
+    fn test_search_bounded() {
+        let dct = vec![
+            (String::from("ab"), None),
+            (String::from("abc"), Some("ab".to_string())),
+            (String::from("bcd"), None),
+            (String::from("def"), None),
+        ];
+        let pt = create_prefix_tree(
+            dct,
+            Some(SearchOptions {
+                case_sensitive: true,
+                check_bounds: true,
+            }),
+        )
+        .unwrap();
+
+        // No word bounds around patterns
+        let matches = dbg!(pt.find_text_matches("abp pabc bcdefg abhx cab".to_string())).unwrap();
+        assert_eq!(matches.len(), 0);
+
+        // Word bounds around patterns
+        let mut matches = dbg!(pt.find_text_matches("abc. -bcd- AB def".to_string())).unwrap();
+        assert_eq!(matches.len(), 3);
+        matches.sort();
+
+        assert_eq!(matches[0].value(), "abc");
+        assert_eq!(matches[1].value(), "bcd");
+        assert_eq!(matches[2].value(), "def");
+    }
+
+    #[test]
+    fn test_search_bounded_diacritics() {
+        let dct = vec![
+            (String::from("abc"), Some("ab".to_string())),
+            (String::from("ábc"), Some("ab-accent".to_string())),
+            (String::from("xyzò"), Some("xyzo-accent".to_string())),
+            (String::from("xyzo"), None),
+        ];
+        let pt = create_prefix_tree(
+            dct,
+            Some(SearchOptions {
+                case_sensitive: true,
+                check_bounds: true,
+            }),
+        )
+        .unwrap();
+
+        let hs = "abc-ábc: xyzo!xyzò äbc-".nfc().collect();
+        let matches = dbg!(pt.find_text_matches(hs)).unwrap();
+        assert_eq!(matches.len(), 4);
+
+        assert_eq!(&matches[0].kw, "ab");
+        assert_eq!(&matches[1].kw, "ab-accent");
+        assert_eq!(&matches[2].kw, "xyzo");
+        assert_eq!(&matches[3].kw, "xyzo-accent");
+    }
+
+    #[test]
+    fn test_search_bounded_case_insensitive() {
+        let dct = vec![
+            (String::from("abC"), Some("ab".to_string())),
+            (String::from("áBC"), Some("ab-accent".to_string())),
+            (String::from("xyzò"), Some("xyzo-accent".to_string())),
+            (String::from("xyzo"), None),
+            (String::from("yöyyi"), Some("Yoyyi".to_string())),
+        ];
+        let pt = create_prefix_tree(
+            dct,
+            Some(SearchOptions {
+                case_sensitive: false,
+                check_bounds: true,
+            }),
+        )
+        .unwrap();
+        let hs = "TEXT: ÁBC_3 Yöyyiaa, ABc, XYzò YÖyyi".nfc().collect();
+        let matches = pt.find_text_matches(hs).unwrap();
+        assert_eq!(matches.len(), 3);
+
+        assert_eq!(&matches[0].kw, "ab");
+        assert_eq!(&matches[1].kw, "xyzo-accent");
+        assert_eq!(&matches[2].kw, "Yoyyi");
     }
 }

@@ -2,6 +2,15 @@ use super::trie::*;
 use pyo3::exceptions as py_errs;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
+use unicode_normalization::UnicodeNormalization;
+
+/// Normalize the given string to unicode NFC standard. This is needed to
+/// properly check word bounds.
+#[pyfunction]
+#[pyo3(signature = (input: "str") -> "str")]
+fn normalize_string(input: String) -> String {
+    input.nfc().collect()
+}
 
 /// Map a SearchError to an appropriate Python error
 fn map_error_py(err: SearchError) -> PyErr {
@@ -231,5 +240,5 @@ fn search_in_texts(
 pub mod aho_corasick_search {
 
     #[pymodule_export]
-    use super::{PyMatch, PyTrie, search_in_text, search_in_texts};
+    use super::{PyMatch, PyTrie, normalize_string, search_in_text, search_in_texts};
 }

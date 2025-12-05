@@ -1,6 +1,7 @@
-pub mod search;
 use std::collections::VecDeque;
+use unicode_normalization::UnicodeNormalization;
 
+pub mod search;
 pub use search::*;
 
 /// Type alias to reference the ID of a node in the prefix tree.
@@ -208,7 +209,10 @@ impl TrieRoot {
     /// their corresponding "following" links. Adjacent or "failure" links must be added
     /// separately by calling the "compute_failure_links" function. This is only meant to
     /// be used during creation of the trie structure.
-    fn add_pattern(&mut self, new_item: String, kw: Option<String>) -> SearchResult<()> {
+    fn add_pattern(&mut self, mut new_item: String, kw: Option<String>) -> SearchResult<()> {
+        // Normalize pattern to unicode NFC (combined)
+        new_item = new_item.nfc().collect();
+
         let mut current_id = self.root_node_id();
         let characters: Vec<char> = new_item.chars().collect();
 
