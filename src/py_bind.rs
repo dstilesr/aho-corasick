@@ -119,13 +119,7 @@ impl PyTrie {
 
         let mut keywords = Vec::new();
         for node in trie_inner.nodes_vec() {
-            if let Node::DictNode {
-                value: _,
-                keyword,
-                nxt: _,
-                adj: _,
-            } = node
-            {
+            if let Node::DictNode { keyword, .. } = node {
                 keywords.push(keyword.clone());
             }
         }

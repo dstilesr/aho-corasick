@@ -1,8 +1,4 @@
-use std::cmp::Ordering;
-
-use crate::trie::SearchError;
-
-use super::{Link, Node, SearchResult, TrieRoot};
+use super::{Link, Node, SearchError, SearchResult, TrieRoot};
 
 /// Represents a match found in a text.
 ///
@@ -10,19 +6,19 @@ use super::{Link, Node, SearchResult, TrieRoot};
 /// `haystack_chars[start:end]` should be equal to the character vector of the "value". Note
 /// that matches are done on a character level, not a byte level, so indexing the string directly
 /// may not yield the expected result.
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, PartialOrd, Ord)]
 pub struct Match {
     /// Index of first character in the match
     start: usize,
-
-    /// 1 + index of last character in the match
-    end: usize,
 
     /// The match value substring that was actually found
     value: String,
 
     /// The corresponding keyword / standard form of the match
     kw: String,
+
+    /// 1 + index of last character in the match
+    end: usize,
 }
 
 impl Match {
@@ -49,26 +45,6 @@ impl Match {
     /// Return the range of characters the match spans.
     pub fn char_range(&self) -> (usize, usize) {
         (self.start, self.end)
-    }
-}
-
-impl PartialOrd for Match {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        if self == other {
-            Some(Ordering::Equal)
-        } else if self.start < other.start
-            || (self.start == other.start && self.value < other.value)
-        {
-            Some(Ordering::Less)
-        } else {
-            Some(Ordering::Greater)
-        }
-    }
-}
-
-impl Ord for Match {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.partial_cmp(other).unwrap()
     }
 }
 
@@ -242,10 +218,7 @@ mod tests {
         assert!(dbg!(matches.len()) > 0);
 
         for Match {
-            start,
-            end,
-            value,
-            kw: _,
+            start, end, value, ..
         } in &matches
         {
             assert_eq!(*end - *start, value.len());
