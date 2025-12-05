@@ -48,11 +48,11 @@ Usage example in Python
 ```python
 import ah_search as acs
 
-dictionary = ["find", "these", "fun", "words"]
-haystack = "finding words in these texts is a lot of fun!"
+dictionary = ["find", "Ding", "these", "fun", "WORDs"]
+haystack = "Finding words in these texts is a lot of fun!"
 
-# TODO: Other options to be added soon...
-for match in acs.search_in_text(dictionary, haystack):
+# Case-insensitive search
+for match in acs.search_in_text(dictionary, haystack, case_sensitive=False):
     print(
         "Found a match - Text: '%s', from char: %d, to char: %d"
         % (
@@ -61,6 +61,8 @@ for match in acs.search_in_text(dictionary, haystack):
             match.to_char,
         )
     )
+
+# TODO: Other options to be added soon...
 ```
 
 ## Environment Setup

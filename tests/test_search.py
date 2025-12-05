@@ -73,3 +73,14 @@ def test_search_multiple():
     for match in m1:
         assert texts[0][match.from_char : match.to_char] == match.value
         assert match.value in dct
+
+
+def test_search_case_insensitive():
+    """
+    Test search with case-insensitive option.
+    """
+    dictionary = ["abc", "cde", "erx"]
+    haystack = "ABCDE eRX cDe"
+    matches = search_in_text(dictionary, haystack, case_sensitive=False)
+
+    assert len(matches) == 4, "Expected 4 matches (case insensitive)"
