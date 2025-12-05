@@ -1,7 +1,6 @@
 pub mod search;
 use std::collections::VecDeque;
 
-use super::follow_links;
 pub use search::*;
 
 /// Type alias to reference the ID of a node in the prefix tree.
@@ -20,7 +19,7 @@ pub enum SearchError {
 pub type SearchResult<T> = Result<T, SearchError>;
 
 /// A link between two nodes in the prefix tree
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Link(char, NodeId);
 
 /// Options to use when performing searches
@@ -97,6 +96,9 @@ impl Node {
                     adj.replace(link);
                 } else {
                     nxt.push(link);
+
+                    // Keep this sorted for binary search
+                    nxt.sort();
                 }
             }
             Node::MedNode { nxt, adj } => {
@@ -104,6 +106,9 @@ impl Node {
                     adj.replace(link);
                 } else {
                     nxt.push(link);
+
+                    // Keep this sorted for binary search
+                    nxt.sort();
                 }
             }
         }
@@ -140,11 +145,15 @@ impl Node {
         self.adj_node().is_some()
     }
 
+    /// Get a link to a following node for a suffix starting with the given character
+    ///
+    /// Use binary search to search for a link that has the given character. Returns None
+    /// if there is no following link indexed with the given character.
     pub fn follow_link(&self, ch: char) -> Option<&Link> {
-        self.next_nodes()
-            .iter()
-            .filter(|Link(c, _)| *c == ch)
-            .next()
+        let nxt = self.next_nodes();
+        nxt.binary_search_by_key(&ch, |Link(c, _)| *c)
+            .ok()
+            .map(|i| &nxt[i])
     }
 }
 
@@ -314,8 +323,8 @@ impl TrieRoot {
         let mut current = self.root_node_id();
         for c in path.chars() {
             let curr_node = self.get_node(current).unwrap();
-            if let Some(nid) = follow_links!(curr_node.next_nodes(), c).next() {
-                current = nid;
+            if let Some(Link(_, nid)) = curr_node.follow_link(c) {
+                current = *nid;
             } else {
                 return None;
             }
