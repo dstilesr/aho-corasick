@@ -141,6 +141,7 @@ impl Node {
 pub struct TrieRoot {
     nodes: Vec<Node>,
     options: SearchOptions,
+    max_pattern_len: usize,
 }
 
 impl TrieRoot {
@@ -150,6 +151,7 @@ impl TrieRoot {
         Self {
             // Add root node
             nodes: vec![Node::new(None, None)],
+            max_pattern_len: 0,
             options,
         }
     }
@@ -220,6 +222,9 @@ impl TrieRoot {
 
         let mut current_id = self.root_node_id();
         let characters: Vec<char> = new_item.chars().collect();
+        if characters.len() > self.max_pattern_len {
+            self.max_pattern_len = characters.len();
+        }
 
         for (i, c) in characters.iter().enumerate() {
             match self.get_node_unchecked(current_id).follow_link(*c) {

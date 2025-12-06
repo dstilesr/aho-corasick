@@ -1,4 +1,5 @@
 use super::{Link, Node, SearchError, SearchResult, TrieRoot};
+use std::collections::VecDeque;
 
 /// Return whether the given character is a "word character", i.e. a Unicode
 /// alphanumeric character, a number or an underscore.
@@ -61,9 +62,13 @@ impl<'a> Match<'a> {
 
 /// Check if a match is word bounded. That is, check if the preceding and following characters
 /// are not word-characters.
-fn is_word_bounded(m: &Match, range: &Vec<char>) -> bool {
-    let left = m.start == 0 || (!is_word_char(range[m.start - 1]));
-    let right = m.end >= range.len() || (!is_word_char(range[m.end]));
+fn is_word_bounded(m: &Match, buffer: &VecDeque<char>, next_char: Option<char>) -> bool {
+    let pat_len = m.end - m.start;
+    let left = m.start == 0 || (!is_word_char(buffer[buffer.len() - pat_len - 1]));
+    let right = match next_char {
+        None => true,
+        Some(ch) => !is_word_char(ch),
+    };
     left && right
 }
 
@@ -93,22 +98,32 @@ impl TrieRoot {
     /// }
     /// ```
     pub fn find_text_matches<'a>(&'a self, mut text: String) -> SearchResult<Vec<Match<'a>>> {
+        let mut char_buffer = VecDeque::with_capacity(self.max_pattern_len + 2);
         if !self.options.case_sensitive {
             text = text.to_lowercase();
         };
 
-        let characters: Vec<char> = text.chars().collect();
         let mut matches: Vec<Match> = Vec::new();
         let root_id = self.root_node_id();
 
         let mut curr_id = root_id;
         let mut current = self.root_node();
 
-        for (idx, ch) in characters.iter().enumerate() {
+        let mut chars_iter = text.chars().peekable();
+        let mut idx: usize = 0;
+        while let Some(ch) = chars_iter.next() {
+            // Buffer updates
+            if self.options.check_bounds {
+                if char_buffer.len() >= (self.max_pattern_len + 1) {
+                    char_buffer.pop_front();
+                }
+                char_buffer.push_back(ch);
+            }
+
             // Node does not have link with the required char - try failovers
             // until node found or root reached
             while curr_id != root_id
-                && let None = current.follow_link(*ch)
+                && let None = current.follow_link(ch)
             {
                 match current.adj_node() {
                     None => return Err(SearchError::MissingLink(curr_id)),
@@ -121,7 +136,7 @@ impl TrieRoot {
 
             // Move to node if edge available. Now we are at a node with the
             // right last character or at root.
-            if let Some(Link(_, nid)) = current.follow_link(*ch) {
+            if let Some(Link(_, nid)) = current.follow_link(ch) {
                 curr_id = *nid;
                 current = self.get_node_unchecked(*nid);
             }
@@ -132,7 +147,9 @@ impl TrieRoot {
                 let check = self.get_node_unchecked(check_id);
                 if let Node::DictNode { value, keyword, .. } = check {
                     let m = Match::new(&value, &keyword, idx + 1);
-                    if (!self.options.check_bounds) || is_word_bounded(&m, &characters) {
+                    let nxt_ch: Option<char> = chars_iter.peek().and_then(|u| Some(*u));
+
+                    if (!self.options.check_bounds) || is_word_bounded(&m, &char_buffer, nxt_ch) {
                         matches.push(m);
                     }
                 }
@@ -143,6 +160,7 @@ impl TrieRoot {
                     }
                 }
             }
+            idx += 1;
         }
 
         Ok(matches)
