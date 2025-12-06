@@ -114,7 +114,7 @@ impl TrieRoot {
                     None => return Err(SearchError::MissingLink(curr_id)),
                     Some(Link(_, nid)) => {
                         curr_id = *nid;
-                        current = self.get_node(*nid)?;
+                        current = self.get_node_unchecked(*nid);
                     }
                 }
             }
@@ -123,13 +123,13 @@ impl TrieRoot {
             // right last character or at root.
             if let Some(Link(_, nid)) = current.follow_link(*ch) {
                 curr_id = *nid;
-                current = self.get_node(*nid)?;
+                current = self.get_node_unchecked(*nid);
             }
 
             // Check for matches
             let mut check_id = curr_id;
             while check_id != root_id {
-                let check = self.get_node(check_id)?;
+                let check = self.get_node_unchecked(check_id);
                 if let Node::DictNode { value, keyword, .. } = check {
                     let m = Match::new(&value, &keyword, idx + 1);
                     if (!self.options.check_bounds) || is_word_bounded(&m, &characters) {

@@ -163,6 +163,11 @@ impl TrieRoot {
         }
     }
 
+    /// Get a node without bounds checking  - to use with guaranteed-safe Ids
+    fn get_node_unchecked(&self, node_id: NodeId) -> &Node {
+        &self.nodes[node_id]
+    }
+
     /// Get the vector of nodes
     pub fn nodes_vec(&self) -> &Vec<Node> {
         &self.nodes
@@ -217,7 +222,7 @@ impl TrieRoot {
         let characters: Vec<char> = new_item.chars().collect();
 
         for (i, c) in characters.iter().enumerate() {
-            match self.get_node(current_id)?.follow_link(*c) {
+            match self.get_node_unchecked(current_id).follow_link(*c) {
                 Some(Link(_, nid)) => current_id = *nid,
                 None => {
                     // Next node not already present - add it to the trie
