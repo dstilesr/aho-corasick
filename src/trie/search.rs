@@ -12,24 +12,29 @@ fn is_word_char(c: char) -> bool {
 /// `haystack_chars[start:end]` should be equal to the character vector of the "value". Note
 /// that matches are done on a character level, not a byte level, so indexing the string directly
 /// may not yield the expected result.
+///
+/// **CAVEAT**
+/// Matches cannot outlive the TrieRoot object that created them. This is because the values and
+/// keywords are references to those stored in the Trie to avoid excessive cloning. Matches must be
+/// processed / consumed immediately after search.
 #[derive(PartialEq, Eq, Debug, PartialOrd, Ord)]
-pub struct Match {
+pub struct Match<'a> {
     /// Index of first character in the match
     start: usize,
 
     /// The match value substring that was actually found
-    value: String,
+    value: &'a str,
 
     /// The corresponding keyword / standard form of the match
-    kw: String,
+    kw: &'a str,
 
     /// 1 + index of last character in the match
     end: usize,
 }
 
-impl Match {
+impl<'a> Match<'a> {
     /// Instantiate a new match from a value and 1 + index of the last character in the match.
-    pub fn new(value: String, kw: String, end_pos: usize) -> Self {
+    pub fn new(value: &'a str, kw: &'a str, end_pos: usize) -> Self {
         Self {
             start: end_pos - value.chars().count(),
             end: end_pos,
@@ -39,13 +44,13 @@ impl Match {
     }
 
     /// Return the value stored in the match.
-    pub fn value(&self) -> &String {
-        &self.value
+    pub fn value(&self) -> &str {
+        self.value
     }
 
     /// Return the value of the associated keyword of the match
-    pub fn keyword(&self) -> &String {
-        &self.kw
+    pub fn keyword(&self) -> &str {
+        self.kw
     }
 
     /// Return the range of characters the match spans.
@@ -87,7 +92,7 @@ impl TrieRoot {
     ///    println!("Found matching string '{value}' in characters {start}-{end}");
     /// }
     /// ```
-    pub fn find_text_matches(&self, mut text: String) -> SearchResult<Vec<Match>> {
+    pub fn find_text_matches<'a>(&'a self, mut text: String) -> SearchResult<Vec<Match<'a>>> {
         if !self.options.case_sensitive {
             text = text.to_lowercase();
         };
@@ -126,7 +131,7 @@ impl TrieRoot {
             while check_id != root_id {
                 let check = self.get_node(check_id)?;
                 if let Node::DictNode { value, keyword, .. } = check {
-                    let m = Match::new(value.clone(), keyword.clone(), idx + 1);
+                    let m = Match::new(&value, &keyword, idx + 1);
                     if (!self.options.check_bounds) || is_word_bounded(&m, &characters) {
                         matches.push(m);
                     }
@@ -183,19 +188,19 @@ mod tests {
         assert_eq!(matches.len(), 4);
 
         // Validate individual matches
-        assert_eq!(&matches[0].value, "ab");
+        assert_eq!(matches[0].value, "ab");
         assert_eq!(matches[0].start, 6);
         assert_eq!(matches[0].end - matches[0].start, matches[0].value.len());
 
-        assert_eq!(&matches[1].value, "cd");
+        assert_eq!(matches[1].value, "cd");
         assert_eq!(matches[1].start, 13);
         assert_eq!(matches[1].end - matches[1].start, matches[1].value.len());
 
-        assert_eq!(&matches[2].value, "ab");
+        assert_eq!(matches[2].value, "ab");
         assert_eq!(matches[2].start, 19);
         assert_eq!(matches[2].end - matches[2].start, matches[2].value.len());
 
-        assert_eq!(&matches[3].value, "abc");
+        assert_eq!(matches[3].value, "abc");
         assert_eq!(matches[3].start, 19);
         assert_eq!(matches[3].end - matches[3].start, matches[3].value.len());
     }
@@ -373,10 +378,10 @@ mod tests {
         let matches = dbg!(pt.find_text_matches(hs)).unwrap();
         assert_eq!(matches.len(), 4);
 
-        assert_eq!(&matches[0].kw, "ab");
-        assert_eq!(&matches[1].kw, "ab-accent");
-        assert_eq!(&matches[2].kw, "xyzo");
-        assert_eq!(&matches[3].kw, "xyzo-accent");
+        assert_eq!(matches[0].kw, "ab");
+        assert_eq!(matches[1].kw, "ab-accent");
+        assert_eq!(matches[2].kw, "xyzo");
+        assert_eq!(matches[3].kw, "xyzo-accent");
     }
 
     #[test]
@@ -400,8 +405,8 @@ mod tests {
         let matches = pt.find_text_matches(hs).unwrap();
         assert_eq!(matches.len(), 3);
 
-        assert_eq!(&matches[0].kw, "ab");
-        assert_eq!(&matches[1].kw, "xyzo-accent");
-        assert_eq!(&matches[2].kw, "Yoyyi");
+        assert_eq!(matches[0].kw, "ab");
+        assert_eq!(matches[1].kw, "xyzo-accent");
+        assert_eq!(matches[2].kw, "Yoyyi");
     }
 }

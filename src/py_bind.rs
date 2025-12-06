@@ -48,14 +48,14 @@ pub struct PyMatch {
     pub to_char: usize,
 }
 
-impl From<&Match> for PyMatch {
+impl<'a> From<&'a Match<'a>> for PyMatch {
     /// Convert a Match object from the Rust API into a PyMatch object to be used
     /// in the Python API
-    fn from(m: &Match) -> Self {
+    fn from(m: &'a Match) -> Self {
         let (start, end) = m.char_range();
         Self {
-            value: m.value().clone(),
-            kw: m.keyword().clone(),
+            value: m.value().to_string(),
+            kw: m.keyword().to_string(),
             from_char: start,
             to_char: end,
         }
