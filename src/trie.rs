@@ -105,6 +105,7 @@ impl Node {
     }
 
     /// Get the vector of following nodes
+    #[inline]
     pub fn next_nodes(&self) -> &Vec<Link> {
         match self {
             Node::DictNode { nxt, .. } => nxt,
@@ -113,6 +114,7 @@ impl Node {
     }
 
     /// Get adjacent (failure) link of this node
+    #[inline]
     pub fn adj_node(&self) -> Option<&Link> {
         let out = match self {
             Node::DictNode { adj, .. } => adj,
@@ -166,6 +168,7 @@ impl TrieRoot {
     }
 
     /// Get a node without bounds checking  - to use with guaranteed-safe Ids
+    #[inline]
     fn get_node_unchecked(&self, node_id: NodeId) -> &Node {
         &self.nodes[node_id]
     }
