@@ -395,12 +395,11 @@ pub fn create_prefix_tree(
         return Err(SearchError::InvalidDictionary);
     }
 
-    let opts_obj = opts.unwrap_or_else(Default::default);
+    let opts_obj = opts.unwrap_or_default();
     if !opts_obj.case_sensitive {
         // Case insensitive - convert all dictionary elements to lowercase
-        for i in 0..dictionary.len() {
-            let (pat, kw) = &dictionary[i];
-            dictionary[i] = (pat.to_lowercase(), kw.clone());
+        for item in &mut dictionary {
+            item.0 = item.0.to_lowercase();
         }
     }
     dictionary.sort();
@@ -409,7 +408,7 @@ pub fn create_prefix_tree(
     for (item, next) in dictionary.iter().zip(&dictionary[1..]) {
         if item.0 == next.0 {
             return Err(SearchError::DuplicateNode);
-        } else if item.0 == "" || next.0 == "" {
+        } else if item.0.is_empty() || next.0.is_empty() {
             return Err(SearchError::InvalidDictionary);
         }
     }

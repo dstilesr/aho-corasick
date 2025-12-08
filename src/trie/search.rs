@@ -146,8 +146,8 @@ impl TrieRoot {
             while check_id != root_id {
                 let check = self.get_node_unchecked(check_id);
                 if let Node::DictNode { value, keyword, .. } = check {
-                    let m = Match::new(&value, &keyword, idx + 1);
-                    let nxt_ch: Option<char> = chars_iter.peek().and_then(|u| Some(*u));
+                    let m = Match::new(value, keyword, idx + 1);
+                    let nxt_ch: Option<char> = chars_iter.peek().copied();
 
                     if (!self.options.check_bounds) || is_word_bounded(&m, &char_buffer, nxt_ch) {
                         matches.push(m);
