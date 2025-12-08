@@ -26,7 +26,10 @@ pub struct Link(char, NodeId);
 /// Options to use when performing searches
 #[derive(Debug)]
 pub struct SearchOptions {
+    /// Whether to distinguish uppercase and lowercase characters.
     pub case_sensitive: bool,
+
+    /// Whether to return only matches that begin and end with word boundaries.
     pub check_bounds: bool,
 }
 

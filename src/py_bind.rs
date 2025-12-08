@@ -1,3 +1,7 @@
+//! Python bindings for the string search library.
+//!
+//! This module provides wrappers and python bindings to access the package
+//! functionality from Python.
 use super::trie::*;
 use pyo3::exceptions as py_errs;
 use pyo3::prelude::*;
@@ -35,15 +39,19 @@ fn map_error_py(err: SearchError) -> PyErr {
 /// string value of the match.
 #[pyclass]
 pub struct PyMatch {
+    /// The matching value found in the string
     #[pyo3(get)]
     pub value: String,
 
+    /// The standard keyword associated with the match
     #[pyo3(get)]
     pub kw: String,
 
+    /// Start of the match character range in the input text
     #[pyo3(get)]
     pub from_char: usize,
 
+    ///End of the match character range in the input text
     #[pyo3(get)]
     pub to_char: usize,
 }
@@ -67,29 +75,29 @@ impl PyMatch {
     /// Initialize a new match given the start and end of its character range, and the
     /// string value.
     #[new]
-    #[pyo3(signature = (start: "int", end: "int", value: "str", keyword: "str"))]
-    pub fn new(start: usize, end: usize, value: String, keyword: String) -> PyResult<Self> {
-        if start >= end {
+    #[pyo3(signature = (from_char: "int", to_char: "int", value: "str", keyword: "str"))]
+    pub fn new(from_char: usize, to_char: usize, value: String, keyword: String) -> PyResult<Self> {
+        if from_char >= to_char {
             return Err(PyErr::new::<py_errs::PyValueError, _>(
                 "Start must precede end of match!",
             ));
-        } else if end - start != value.chars().count() {
+        } else if to_char - from_char != value.chars().count() {
             return Err(PyErr::new::<py_errs::PyValueError, _>(
                 "Range length must match total characters in value!",
             ));
         }
 
         Ok(Self {
-            from_char: start,
-            to_char: end,
-            value: value,
+            from_char,
+            to_char,
+            value,
             kw: keyword,
         })
     }
 
     pub fn __repr__(&self) -> String {
         format!(
-            "PyMatch(start={}, end={}, value=\"{}\", keyword=\"{}\")",
+            "PyMatch(from_char={}, to_char={}, value=\"{}\", kw=\"{}\")",
             self.from_char,
             self.to_char,
             self.value.replace('"', "[QUOT]"),
@@ -241,6 +249,7 @@ fn search_in_texts(
     Ok(matches_list)
 }
 
+/// The module to expose as importable from Python.
 #[pyo3::pymodule]
 #[pyo3(name = "ah_search_rs")]
 pub mod aho_corasick_search {
