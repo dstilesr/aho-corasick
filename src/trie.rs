@@ -46,7 +46,7 @@ pub struct Node {
     value: Option<String>,
     keyword: Option<String>,
     nxt: Vec<Link>,
-    adj: Option<Link>,
+    fail_to: Option<Link>,
 }
 
 impl Default for Node {
@@ -56,7 +56,7 @@ impl Default for Node {
             value: None,
             keyword: None,
             nxt: Vec::new(),
-            adj: None,
+            fail_to: None,
         }
     }
 }
@@ -81,7 +81,7 @@ impl Node {
                 keyword: Some(keyword.unwrap_or_else(|| s.clone())),
                 value: Some(s),
                 nxt: Vec::new(),
-                adj: None,
+                fail_to: None,
             },
         }
     }
@@ -90,7 +90,7 @@ impl Node {
     /// links list. Otherwise, it is added to the next links list.
     fn add_link(&mut self, link: Link, adjacent: bool) {
         if adjacent {
-            self.adj.replace(link);
+            self.fail_to.replace(link);
         } else {
             self.nxt.push(link);
         }
@@ -104,12 +104,8 @@ impl Node {
 
     /// Get adjacent (failure) link of this node
     #[inline]
-    pub fn adj_node(&self) -> Option<&Link> {
-        self.adj.as_ref()
-    }
-
-    pub fn has_adj_node(&self) -> bool {
-        self.adj_node().is_some()
+    pub fn fail_node(&self) -> Option<&Link> {
+        self.fail_to.as_ref()
     }
 
     /// Get a link to a following node for a suffix starting with the given character
@@ -145,7 +141,7 @@ impl TrieRoot {
     fn new(options: SearchOptions) -> Self {
         Self {
             // Add root node
-            nodes: vec![Node::new(None, None)],
+            nodes: vec![Node::default()],
             max_pattern_len: 0,
             options,
         }
@@ -194,7 +190,7 @@ impl TrieRoot {
     }
 
     /// Add a link from one node in the tree to another
-    fn add_link(&mut self, from: NodeId, to: NodeId, c: char, is_adj: bool) -> SearchResult<()> {
+    fn add_link(&mut self, from: NodeId, to: NodeId, c: char, fail_link: bool) -> SearchResult<()> {
         if to >= self.nodes.len() {
             return Err(SearchError::InvalidNodeId(to));
         }
@@ -203,7 +199,7 @@ impl TrieRoot {
         }
         let lnk = Link(c, to);
         let from_node = &mut self.nodes[from];
-        from_node.add_link(lnk, is_adj);
+        from_node.add_link(lnk, fail_link);
         Ok(())
     }
 
@@ -271,7 +267,7 @@ impl TrieRoot {
             }
 
             let parent = self.get_node(parent_id)?;
-            let mut check_id = *match parent.adj_node() {
+            let mut check_id = *match parent.fail_node() {
                 Some(Link(_, nid)) => nid,
                 _ => return Err(SearchError::MissingLink(parent_id)),
             };
@@ -288,7 +284,7 @@ impl TrieRoot {
                         if check_id == self.root_node_id() {
                             self.add_link(current_id, check_id, edge_char, true)?;
                             break;
-                        } else if let Some(Link(_, nid)) = check.adj_node() {
+                        } else if let Some(Link(_, nid)) = check.fail_node() {
                             check_id = *nid;
                             check = self.get_node(check_id)?;
                         } else {
@@ -426,7 +422,7 @@ mod tests {
         let pt = create_prefix_tree(dictionary, None).unwrap();
 
         // Verify root node properties
-        assert!(pt.root_node().adj_node().is_none());
+        assert!(pt.root_node().fail_node().is_none());
         assert_eq!(pt.root_node().next_nodes().len(), 2);
 
         let mut root_chars: Vec<char> = pt
@@ -535,42 +531,42 @@ mod tests {
         let bcd_node = dbg!(pt.node_by_path("bcd").unwrap());
 
         // bc -> c
-        if let Some(Link(_, nid)) = pt.get_node(bc_node).unwrap().adj_node() {
+        if let Some(Link(_, nid)) = pt.get_node(bc_node).unwrap().fail_node() {
             assert_eq!(*nid, c_node);
         } else {
             panic!("Expected an adjacent node!")
         }
 
         // bcd -> cd
-        if let Some(Link(_, nid)) = pt.get_node(bcd_node).unwrap().adj_node() {
+        if let Some(Link(_, nid)) = pt.get_node(bcd_node).unwrap().fail_node() {
             assert_eq!(*nid, cd_node);
         } else {
             panic!("Expected an adjacent node!")
         }
 
         // abc -> bc
-        if let Some(Link(_, nid)) = pt.get_node(abc_node).unwrap().adj_node() {
+        if let Some(Link(_, nid)) = pt.get_node(abc_node).unwrap().fail_node() {
             assert_eq!(*nid, bc_node);
         } else {
             panic!("Expected an adjacent node!")
         }
 
         // ab -> b
-        if let Some(Link(_, nid)) = pt.get_node(ab_node).unwrap().adj_node() {
+        if let Some(Link(_, nid)) = pt.get_node(ab_node).unwrap().fail_node() {
             assert_eq!(*nid, b_node);
         } else {
             panic!("Expected an adjacent node!")
         }
 
         // b -> root
-        if let Some(Link(_, nid)) = pt.get_node(b_node).unwrap().adj_node() {
+        if let Some(Link(_, nid)) = pt.get_node(b_node).unwrap().fail_node() {
             assert_eq!(*nid, pt.root_node_id());
         } else {
             panic!("Expected an adjacent node!")
         }
 
         // cd -> root
-        if let Some(Link(_, nid)) = pt.get_node(cd_node).unwrap().adj_node() {
+        if let Some(Link(_, nid)) = pt.get_node(cd_node).unwrap().fail_node() {
             assert_eq!(*nid, pt.root_node_id());
         } else {
             panic!("Expected an adjacent node!")
@@ -604,42 +600,42 @@ mod tests {
         let bab_node = dbg!(pt.node_by_path("bab").unwrap());
 
         // ba -> a
-        if let Some(Link(_, nid)) = pt.get_node(ba_node).unwrap().adj_node() {
+        if let Some(Link(_, nid)) = pt.get_node(ba_node).unwrap().fail_node() {
             assert_eq!(*nid, a_node);
         } else {
             panic!("Expected an adjacent node!")
         }
 
         // ca -> a
-        if let Some(Link(_, nid)) = pt.get_node(ca_node).unwrap().adj_node() {
+        if let Some(Link(_, nid)) = pt.get_node(ca_node).unwrap().fail_node() {
             assert_eq!(*nid, a_node);
         } else {
             panic!("Expected an adjacent node!")
         }
 
         // bc -> c
-        if let Some(Link(_, nid)) = pt.get_node(bc_node).unwrap().adj_node() {
+        if let Some(Link(_, nid)) = pt.get_node(bc_node).unwrap().fail_node() {
             assert_eq!(*nid, c_node);
         } else {
             panic!("Expected an adjacent node!")
         }
 
         // ab -> b
-        if let Some(Link(_, nid)) = pt.get_node(ab_node).unwrap().adj_node() {
+        if let Some(Link(_, nid)) = pt.get_node(ab_node).unwrap().fail_node() {
             assert_eq!(*nid, b_node);
         } else {
             panic!("Expected an adjacent node!")
         }
 
         // bca -> ca
-        if let Some(Link(_, nid)) = pt.get_node(bca_node).unwrap().adj_node() {
+        if let Some(Link(_, nid)) = pt.get_node(bca_node).unwrap().fail_node() {
             assert_eq!(*nid, ca_node);
         } else {
             panic!("Expected an adjacent node!")
         }
 
         // bab -> ab
-        if let Some(Link(_, nid)) = pt.get_node(bab_node).unwrap().adj_node() {
+        if let Some(Link(_, nid)) = pt.get_node(bab_node).unwrap().fail_node() {
             assert_eq!(*nid, ab_node);
         } else {
             panic!("Expected an adjacent node!")

@@ -125,7 +125,7 @@ impl TrieRoot {
             while curr_id != root_id
                 && let None = current.follow_link(ch)
             {
-                match current.adj_node() {
+                match current.fail_node() {
                     None => return Err(SearchError::MissingLink(curr_id)),
                     Some(Link(_, nid)) => {
                         curr_id = *nid;
@@ -153,7 +153,7 @@ impl TrieRoot {
                         matches.push(m);
                     }
                 }
-                match check.adj_node() {
+                match check.fail_node() {
                     None => return Err(SearchError::MissingLink(check_id)),
                     Some(Link(_, nid)) => {
                         check_id = *nid;
