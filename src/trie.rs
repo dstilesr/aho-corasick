@@ -42,17 +42,23 @@ impl Default for SearchOptions {
 
 /// Represents a node in the prefix tree for the Aho-Corasick structure
 #[derive(Debug)]
-pub enum Node {
-    /// Dictionary nodes represent a complete pattern. When these nodes are reached, a match has been found.
-    DictNode {
-        value: String,
-        keyword: String,
-        nxt: Vec<Link>,
-        adj: Option<Link>,
-    },
+pub struct Node {
+    value: Option<String>,
+    keyword: Option<String>,
+    nxt: Vec<Link>,
+    adj: Option<Link>,
+}
 
-    /// MedNodes represent intermediate nodes / incomplete pattern matches
-    MedNode { nxt: Vec<Link>, adj: Option<Link> },
+impl Default for Node {
+    /// Default instantiation - no value, keyword, empty links
+    fn default() -> Self {
+        Self {
+            value: None,
+            keyword: None,
+            nxt: Vec::new(),
+            adj: None,
+        }
+    }
 }
 
 impl Node {
@@ -70,13 +76,10 @@ impl Node {
     /// ```
     pub fn new(value: Option<String>, keyword: Option<String>) -> Self {
         match value {
-            None => Self::MedNode {
-                nxt: Vec::new(),
-                adj: None,
-            },
-            Some(s) => Self::DictNode {
-                keyword: keyword.unwrap_or_else(|| s.clone()),
-                value: s,
+            None => Self::default(),
+            Some(s) => Self {
+                keyword: Some(keyword.unwrap_or_else(|| s.clone())),
+                value: Some(s),
                 nxt: Vec::new(),
                 adj: None,
             },
@@ -86,41 +89,23 @@ impl Node {
     /// Add a link to the node. If `adjacent` is true, adds the link to the adjacent
     /// links list. Otherwise, it is added to the next links list.
     fn add_link(&mut self, link: Link, adjacent: bool) {
-        match self {
-            Node::DictNode { nxt, adj, .. } => {
-                if adjacent {
-                    adj.replace(link);
-                } else {
-                    nxt.push(link);
-                }
-            }
-            Node::MedNode { nxt, adj } => {
-                if adjacent {
-                    adj.replace(link);
-                } else {
-                    nxt.push(link);
-                }
-            }
+        if adjacent {
+            self.adj.replace(link);
+        } else {
+            self.nxt.push(link);
         }
     }
 
     /// Get the vector of following nodes
     #[inline]
     pub fn next_nodes(&self) -> &Vec<Link> {
-        match self {
-            Node::DictNode { nxt, .. } => nxt,
-            Node::MedNode { nxt, .. } => nxt,
-        }
+        &self.nxt
     }
 
     /// Get adjacent (failure) link of this node
     #[inline]
     pub fn adj_node(&self) -> Option<&Link> {
-        let out = match self {
-            Node::DictNode { adj, .. } => adj,
-            Node::MedNode { adj, .. } => adj,
-        };
-        out.as_ref()
+        self.adj.as_ref()
     }
 
     pub fn has_adj_node(&self) -> bool {
@@ -136,6 +121,14 @@ impl Node {
         nxt.binary_search_by_key(&ch, |Link(c, _)| *c)
             .ok()
             .map(|i| &nxt[i])
+    }
+
+    /// Get the value and keyword of the node. These are not None if the node is a dictionary node.
+    pub fn value_keyword(&self) -> Option<(&str, &str)> {
+        match (&self.value, &self.keyword) {
+            (Some(s), Some(t)) => Some((s, t)),
+            _ => None,
+        }
     }
 }
 
@@ -179,6 +172,7 @@ impl TrieRoot {
     }
 
     /// Get the ID of the root node of the tree
+    #[inline]
     pub fn root_node_id(&self) -> usize {
         0
     }
@@ -333,11 +327,7 @@ impl TrieRoot {
     /// once when initializing.
     fn finalize_links(&mut self) {
         for node in &mut self.nodes {
-            match node {
-                Node::DictNode { nxt, .. } | Node::MedNode { nxt, .. } => {
-                    nxt.sort();
-                }
-            }
+            node.nxt.sort();
         }
     }
 }
@@ -457,8 +447,8 @@ mod tests {
         // Count dictionary nodes
         let mut dct_vals = Vec::new();
         for node in pt.nodes {
-            if let Node::DictNode { value, .. } = node {
-                dct_vals.push(value.clone());
+            if let Some((value, _)) = node.value_keyword() {
+                dct_vals.push(value.to_string());
             }
         }
         dct_vals.sort();
@@ -485,11 +475,11 @@ mod tests {
 
         // Check 'ab' node
         let ab_node = pt.get_node(pt.node_by_path("ab").unwrap()).unwrap();
-        let ab_nxt = match ab_node {
-            Node::MedNode { nxt: _, adj: _ } => panic!("Expected a dictionary node"),
-            Node::DictNode { value, nxt, .. } => {
+        let ab_nxt = match ab_node.value_keyword() {
+            None => panic!("Expected a dictionary node"),
+            Some((value, _)) => {
                 assert_eq!("ab", value);
-                nxt
+                &ab_node.nxt
             }
         };
         assert_eq!(ab_nxt.len(), 1);
@@ -498,9 +488,9 @@ mod tests {
 
         // Check 'c' node
         let c_node = pt.get_node(pt.node_by_path("c").unwrap()).unwrap();
-        let c_nxt = match c_node {
-            Node::MedNode { nxt, .. } => nxt,
-            Node::DictNode { .. } => panic!("Expected intermediate node"),
+        let c_nxt = match c_node.value_keyword() {
+            None => &c_node.nxt,
+            Some(_) => panic!("Expected intermediate node"),
         };
         assert_eq!(c_nxt.len(), 2);
         let mut chars: Vec<char> = c_nxt.iter().map(|Link(c, _)| *c).collect();
@@ -707,7 +697,7 @@ mod tests {
         assert_eq!(pt.total_nodes(), 7);
         let mut total_dct = 0;
         for node in pt.nodes {
-            if let Node::DictNode { value, .. } = node {
+            if let Some((value, _)) = node.value_keyword() {
                 total_dct += 1;
                 assert_eq!(value, value.to_lowercase());
             }

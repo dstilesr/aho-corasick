@@ -1,4 +1,4 @@
-use super::{Link, Node, SearchError, SearchResult, TrieRoot};
+use super::{Link, SearchError, SearchResult, TrieRoot};
 use std::collections::VecDeque;
 
 /// Return whether the given character is a "word character", i.e. a Unicode
@@ -145,7 +145,7 @@ impl TrieRoot {
             let mut check_id = curr_id;
             while check_id != root_id {
                 let check = self.get_node_unchecked(check_id);
-                if let Node::DictNode { value, keyword, .. } = check {
+                if let Some((value, keyword)) = check.value_keyword() {
                     let m = Match::new(value, keyword, idx + 1);
                     let nxt_ch: Option<char> = chars_iter.peek().copied();
 
