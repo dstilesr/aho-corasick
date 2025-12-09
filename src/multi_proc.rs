@@ -4,6 +4,10 @@ use std::thread;
 const MAX_THREADS: usize = 16;
 
 /// Get the max number of threads to use for parallel processing.
+///
+/// Uses `std::thread::available_parallelism` to find the number of possible threads
+/// that can be spawned for multiprocessing. If `available_parallelism` returns an error,
+/// returns 1, for single-threaded execution instead.
 pub fn get_total_threads() -> usize {
     match thread::available_parallelism() {
         Ok(i) => i.get(),
@@ -17,13 +21,21 @@ pub fn get_total_threads() -> usize {
 
 /// Apply a function in parallel to the given items. Results will be returned in the
 /// same order as the inputs.
+///
+/// Example
+/// ```rust
+/// use ah_search_rs::multi_proc;
+///
+/// let items: Vec<i32> = (0..1000).collect();
+/// let mapped: Vec<i32> = multi_proc::parallel_apply(items, |num| num * 2 + 1);
+/// ```
 pub fn parallel_apply<T, U, F>(mut items: Vec<T>, mapping: F) -> Vec<U>
 where
     F: Fn(T) -> U + Send + Sync,
     T: Clone + Send,
     U: Send,
 {
-    if items.len() == 0 {
+    if items.is_empty() {
         return Vec::new();
     }
     let num_threads = get_total_threads().min(items.len()).min(MAX_THREADS);
