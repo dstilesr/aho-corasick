@@ -6,4 +6,5 @@
 #[cfg(feature = "python_bind")]
 pub mod py_bind;
 
+pub mod multi_proc;
 pub mod trie;
