@@ -157,6 +157,7 @@ impl PyTrie {
     }
 
     /// Search for occurrences of the defined patterns in the given text
+    #[pyo3(signature = (text: "str") -> "list[PyMatch]")]
     pub fn search(&self, text: String) -> PyResult<Vec<PyMatch>> {
         let results = self
             .trie_inner
@@ -167,8 +168,13 @@ impl PyTrie {
     }
 
     /// Search for occurrences in a list of texts. Search will be done in parallel across texts.
-    pub fn search_many(&self, texts: Vec<String>) -> PyResult<Vec<Vec<PyMatch>>> {
-        let results = multi_proc::parallel_apply(texts, |txt| self.search(txt));
+    #[pyo3(signature = (texts: "list[str]", num_threads: "int | None" = None) -> "list[list[PyMatch]]")]
+    pub fn search_many(
+        &self,
+        texts: Vec<String>,
+        num_threads: Option<usize>,
+    ) -> PyResult<Vec<Vec<PyMatch>>> {
+        let results = multi_proc::parallel_apply(texts, |txt| self.search(txt), num_threads);
         let mut results_out = Vec::with_capacity(results.len());
         for r in results {
             match r {
@@ -231,12 +237,18 @@ fn search_in_text(
 /// than calling "search_in_text" individually on each one, since that would require the prefix tree to
 /// be instantiated multiple times.
 #[pyfunction]
-#[pyo3(signature = (dictionary: "dict[str, str]", haystacks: "list[str]", case_sensitive=true, check_bounds=false) -> "list[list[str]]")]
+#[pyo3(signature = (
+    dictionary: "dict[str, str]",
+    haystacks: "list[str]",
+    case_sensitive=true,
+    check_bounds=false,
+    num_threads: "int | None" = None) -> "list[list[PyMatch]]")]
 fn search_in_texts(
     dictionary: &Bound<'_, PyDict>,
     haystacks: Vec<String>,
     case_sensitive: bool,
     check_bounds: bool,
+    num_threads: Option<usize>,
 ) -> PyResult<Vec<Vec<PyMatch>>> {
     let opts = SearchOptions {
         case_sensitive,
@@ -245,12 +257,16 @@ fn search_in_texts(
     let dct = py_dict_to_vector(dictionary)?;
     let prefix_tree = create_prefix_tree(dct, Some(opts)).map_err(map_error_py)?;
 
-    let matches = multi_proc::parallel_apply(haystacks, |txt| {
-        prefix_tree
-            .find_text_matches(txt)
-            .map_err(map_error_py)
-            .map(|result| result.iter().map(PyMatch::from).collect())
-    });
+    let matches = multi_proc::parallel_apply(
+        haystacks,
+        |txt| {
+            prefix_tree
+                .find_text_matches(txt)
+                .map_err(map_error_py)
+                .map(|result| result.iter().map(PyMatch::from).collect())
+        },
+        num_threads,
+    );
 
     let mut matches_list = Vec::with_capacity(matches.len());
     for m in matches {

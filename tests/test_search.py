@@ -121,6 +121,35 @@ def test_search_trie_obj():
         assert m.kw in kws
 
 
+def test_search_multiple_trie_obj():
+    """
+    Test search with a simple dictionary over multiple texts, with the trie object
+    """
+    texts = [
+        "abq cdr qpbcd 12abcd",
+        "xy, tre, 1245, mllmkh, aqqsd",
+        "432 bcda plodq",
+    ]
+    dct = to_dictionary(["ab", "abc", "cd", "bcd", "dq"])
+    trie = PyTrie(dct)
+    matches: list[list[PyMatch]] = trie.search_many(texts)
+
+    assert len(matches) == len(texts)
+    m1, m2, m3 = matches
+
+    assert len(m1) == 8
+    assert len(m2) == 0
+    assert len(m3) == 3
+
+    for match in m3:
+        assert texts[2][match.from_char : match.to_char] == match.value
+        assert match.value in dct
+
+    for match in m1:
+        assert texts[0][match.from_char : match.to_char] == match.value
+        assert match.value in dct
+
+
 def test_search_trie_obj_case_insensitive():
     """
     Basic search tests using the PyTrie object with case insensitive option

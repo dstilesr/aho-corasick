@@ -27,9 +27,9 @@ pub fn get_total_threads() -> usize {
 /// use ah_search_rs::multi_proc;
 ///
 /// let items: Vec<i32> = (0..1000).collect();
-/// let mapped: Vec<i32> = multi_proc::parallel_apply(items, |num| num * 2 + 1);
+/// let mapped: Vec<i32> = multi_proc::parallel_apply(items, |num| num * 2 + 1, None);
 /// ```
-pub fn parallel_apply<T, U, F>(mut items: Vec<T>, mapping: F) -> Vec<U>
+pub fn parallel_apply<T, U, F>(mut items: Vec<T>, mapping: F, num_threads: Option<usize>) -> Vec<U>
 where
     F: Fn(T) -> U + Send + Sync,
     T: Clone + Send,
@@ -38,10 +38,21 @@ where
     if items.is_empty() {
         return Vec::new();
     }
-    let num_threads = get_total_threads().min(items.len()).min(MAX_THREADS);
-    log::debug!("Mapping with {} threads", num_threads);
+    let n_threads = match num_threads {
+        None => get_total_threads().min(items.len()).min(MAX_THREADS),
+        Some(i) => {
+            if i <= 0 {
+                log::warn!("Invalid thread count: {}. Using default.", i);
+                get_total_threads().min(items.len()).min(MAX_THREADS)
+            } else {
+                i.min(items.len())
+            }
+        }
+    };
 
-    if num_threads == 1 {
+    log::debug!("Mapping with {} threads", n_threads);
+
+    if n_threads == 1 {
         // Single thread - run simple mapping
         let mut out = Vec::with_capacity(items.len());
         for elem in items {
@@ -50,8 +61,8 @@ where
         return out;
     }
 
-    let chunk_size = items.len() / num_threads + 1;
-    let mut input_groups: Vec<Vec<T>> = Vec::with_capacity(num_threads);
+    let chunk_size = items.len() / n_threads + 1;
+    let mut input_groups: Vec<Vec<T>> = Vec::with_capacity(n_threads);
     for chunk in items.chunks_mut(chunk_size) {
         input_groups.push(chunk.into());
     }
@@ -59,7 +70,7 @@ where
     let mut output = Vec::with_capacity(items.len());
 
     thread::scope(|s| {
-        let mut handles = Vec::with_capacity(num_threads);
+        let mut handles = Vec::with_capacity(n_threads);
         for elems in input_groups {
             handles.push(s.spawn(|| {
                 let mut outputs = Vec::with_capacity(elems.len());
@@ -89,7 +100,7 @@ mod tests {
         assert!(total_par > 1);
         let my_inputs: Vec<usize> = (0..total_par * 4).collect();
 
-        let mapped = parallel_apply(my_inputs.clone(), |num| num + 1);
+        let mapped = parallel_apply(my_inputs.clone(), |num| num + 1, None);
 
         assert_eq!(mapped.len(), my_inputs.len());
         for (idx, &item) in mapped.iter().enumerate() {
