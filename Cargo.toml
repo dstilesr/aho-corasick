@@ -9,7 +9,9 @@ path = "src/lib.rs"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+log = "0.4.29"
 pyo3 = {version = "0.27.2", features = ["experimental-inspect"], optional = true}
+pyo3-log = "0.13.2"
 unicode-normalization = "0.1.25"
 
 [dev-dependencies]

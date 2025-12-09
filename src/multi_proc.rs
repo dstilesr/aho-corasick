@@ -17,7 +17,12 @@ pub fn get_total_threads() -> usize {
 
 /// Apply a function in parallel to the given items. Results will be returned in the
 /// same order as the inputs.
-pub fn parallel_apply<T: Clone + Send, U: Send>(mut items: Vec<T>, mapping: fn(T) -> U) -> Vec<U> {
+pub fn parallel_apply<T, U, F>(mut items: Vec<T>, mapping: F) -> Vec<U>
+where
+    F: Fn(T) -> U + Send + Sync,
+    T: Clone + Send,
+    U: Send,
+{
     if items.len() == 0 {
         return Vec::new();
     }
@@ -44,7 +49,7 @@ pub fn parallel_apply<T: Clone + Send, U: Send>(mut items: Vec<T>, mapping: fn(T
     thread::scope(|s| {
         let mut handles = Vec::with_capacity(num_threads);
         for elems in input_groups {
-            handles.push(s.spawn(move || {
+            handles.push(s.spawn(|| {
                 let mut outputs = Vec::with_capacity(elems.len());
                 for elem in elems {
                     outputs.push(mapping(elem));

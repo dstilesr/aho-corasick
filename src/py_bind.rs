@@ -2,6 +2,7 @@
 //!
 //! This module provides wrappers and python bindings to access the package
 //! functionality from Python.
+use super::multi_proc;
 use super::trie::*;
 use pyo3::exceptions as py_errs;
 use pyo3::prelude::*;
@@ -165,13 +166,17 @@ impl PyTrie {
         Ok(results.iter().map(PyMatch::from).collect())
     }
 
-    /// Search for occurrences in a list of texts
+    /// Search for occurrences in a list of texts. Search will be done in parallel across texts.
     pub fn search_many(&self, texts: Vec<String>) -> PyResult<Vec<Vec<PyMatch>>> {
-        let mut results_all = Vec::with_capacity(texts.len());
-        for txt in texts {
-            results_all.push(self.search(txt)?)
+        let results = multi_proc::parallel_apply(texts, |txt| self.search(txt));
+        let mut results_out = Vec::with_capacity(results.len());
+        for r in results {
+            match r {
+                Ok(v) => results_out.push(v),
+                Err(e) => return Err(e),
+            }
         }
-        Ok(results_all)
+        Ok(results_out)
     }
 
     pub fn __str__(&self) -> String {
@@ -237,13 +242,22 @@ fn search_in_texts(
         case_sensitive,
         check_bounds,
     };
-    let prefix_tree =
-        create_prefix_tree(py_dict_to_vector(dictionary)?, Some(opts)).map_err(map_error_py)?;
-    let mut matches_list = Vec::with_capacity(haystacks.len());
+    let dct = py_dict_to_vector(dictionary)?;
+    let prefix_tree = create_prefix_tree(dct, Some(opts)).map_err(map_error_py)?;
 
-    for h in haystacks {
-        let matches = prefix_tree.find_text_matches(h).map_err(map_error_py)?;
-        matches_list.push(matches.iter().map(PyMatch::from).collect());
+    let matches = multi_proc::parallel_apply(haystacks, |txt| {
+        prefix_tree
+            .find_text_matches(txt)
+            .map_err(map_error_py)
+            .map(|result| result.iter().map(PyMatch::from).collect())
+    });
+
+    let mut matches_list = Vec::with_capacity(matches.len());
+    for m in matches {
+        match m {
+            Err(e) => return Err(e),
+            Ok(item) => matches_list.push(item),
+        }
     }
 
     Ok(matches_list)
@@ -253,6 +267,14 @@ fn search_in_texts(
 #[pyo3::pymodule]
 #[pyo3(name = "ah_search_rs")]
 pub mod aho_corasick_search {
+    use pyo3::prelude::*;
+
+    /// Module initialization - setup Python logging integration
+    #[pymodule_init]
+    fn init(_m: &Bound<'_, PyModule>) -> PyResult<()> {
+        pyo3_log::init();
+        Ok(())
+    }
 
     #[pymodule_export]
     use super::{PyMatch, PyTrie, normalize_string, search_in_text, search_in_texts};
