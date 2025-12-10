@@ -83,11 +83,11 @@ fn read_dictionary(filepath: &str) -> io::Result<Vec<(String, Option<String>)>> 
 /// Saves the matches in a TSV format at the output path.
 fn save_matches(matches: Vec<trie::Match>, filepath: &str) -> io::Result<()> {
     let mut out_file = fs::File::create(filepath)?;
-    out_file.write(b"start\tend\tvalue\tkeyword\n")?;
+    out_file.write_all(b"start\tend\tvalue\tkeyword\n")?;
     for m in matches {
         let (start, end) = m.char_range();
         let line = format!("{}\t{}\t{}\t{}\n", start, end, m.value(), m.keyword());
-        out_file.write(line.as_bytes())?;
+        out_file.write_all(line.as_bytes())?;
     }
 
     Ok(())
