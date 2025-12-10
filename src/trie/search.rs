@@ -127,9 +127,9 @@ impl TrieRoot {
             {
                 match current.fail_node() {
                     None => return Err(SearchError::MissingLink(curr_id)),
-                    Some(Link(_, nid)) => {
-                        curr_id = *nid;
-                        current = self.get_node_unchecked(*nid);
+                    Some(nid) => {
+                        curr_id = nid;
+                        current = self.get_node_unchecked(nid);
                     }
                 }
             }
@@ -155,8 +155,8 @@ impl TrieRoot {
                 }
                 match check.fail_node() {
                     None => return Err(SearchError::MissingLink(check_id)),
-                    Some(Link(_, nid)) => {
-                        check_id = *nid;
+                    Some(nid) => {
+                        check_id = nid;
                     }
                 }
             }

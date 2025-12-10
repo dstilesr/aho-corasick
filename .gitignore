@@ -38,3 +38,6 @@ uv.lock
 # Test Assets
 test-files/
 **/*.tsv
+
+# Profiling
+profile.json*
