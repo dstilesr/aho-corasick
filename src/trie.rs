@@ -16,6 +16,18 @@ pub enum SearchError {
     MissingLink(NodeId),
 }
 
+impl std::fmt::Display for SearchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let str_val = match self {
+            Self::InvalidNodeId(id) => format!("Invalid node ID: {}", id),
+            Self::DuplicateNode => "Duplicate node".to_string(),
+            Self::InvalidDictionary => "Invalid dictionary".to_string(),
+            Self::MissingLink(id) => format!("Missing link for node ID: {}", id),
+        };
+        write!(f, "{}", str_val)
+    }
+}
+
 /// Result type for this library
 pub type SearchResult<T> = Result<T, SearchError>;
 

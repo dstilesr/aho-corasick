@@ -34,3 +34,7 @@ uv.lock
 # Ruff
 .ruff*
 .ruff_cache
+
+# Test Assets
+test-files/
+**/*.tsv

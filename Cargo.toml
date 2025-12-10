@@ -8,7 +8,13 @@ name = "ah_search_rs"
 path = "src/lib.rs"
 crate-type = ["cdylib", "rlib"]
 
+[[example]]
+crate-type = ["bin"]
+name = "search_single"
+required-features = ["clap"]
+
 [dependencies]
+clap = { version = "4.5.53", optional = true, features = ["derive"] }
 log = "0.4.29"
 pyo3 = {version = "0.27.2", features = ["experimental-inspect"], optional = true}
 pyo3-log = {version = "0.13.2", optional = true}
@@ -21,3 +27,4 @@ rand_distr = "0.5.1"
 [features]
 default = []
 python_bind = ["dep:pyo3", "dep:pyo3-log"]
+clap = ["dep:clap"]

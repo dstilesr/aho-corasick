@@ -41,7 +41,7 @@ where
     let n_threads = match num_threads {
         None => get_total_threads().min(items.len()).min(MAX_THREADS),
         Some(i) => {
-            if i <= 0 {
+            if i == 0 {
                 log::warn!("Invalid thread count: {}. Using default.", i);
                 get_total_threads().min(items.len()).min(MAX_THREADS)
             } else {
