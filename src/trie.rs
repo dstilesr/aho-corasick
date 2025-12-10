@@ -62,6 +62,7 @@ pub struct Node {
     keyword: Option<String>,
     nxt: Vec<Link>,
     fail_to: Option<NodeId>,
+    dct_to: Option<NodeId>,
 }
 
 impl Default for Node {
@@ -72,6 +73,7 @@ impl Default for Node {
             keyword: None,
             nxt: Vec::new(),
             fail_to: None,
+            dct_to: None,
         }
     }
 }
@@ -97,6 +99,7 @@ impl Node {
                 value: Some(s),
                 nxt: Vec::new(),
                 fail_to: None,
+                dct_to: None,
             },
         }
     }
@@ -121,6 +124,13 @@ impl Node {
     #[inline]
     pub fn fail_node(&self) -> Option<NodeId> {
         self.fail_to
+    }
+
+    /// Get the first dictionary node found by following the trie's failure links
+    /// from this node.
+    #[inline]
+    pub fn fail_dct(&self) -> Option<NodeId> {
+        self.dct_to
     }
 
     /// Get a link to a following node for a suffix starting with the given character
@@ -339,10 +349,31 @@ impl TrieRoot {
     }
 
     /// Sort the lists of next links for all the nodes in the tree. This should be called just
-    /// once when initializing.
+    /// once when initializing. Also assigns the dictionary failure nodes.
     fn finalize_links(&mut self) {
-        for node in &mut self.nodes {
+        for node in self.nodes.iter_mut() {
             node.nxt.sort();
+        }
+
+        for i in 0..self.nodes.len() {
+            if i == self.root_node_id() {
+                continue;
+            }
+
+            // Follow fail nodes until reaching root or a dictionary node
+            let mut curr_id = self.nodes[i].fail_node().unwrap();
+            while curr_id != self.root_node_id() {
+                let curr = self.get_node_unchecked(curr_id);
+                match curr.value_keyword() {
+                    Some(_) => {
+                        self.nodes[i].dct_to.replace(curr_id);
+                        break;
+                    }
+                    None => {
+                        curr_id = curr.fail_node().unwrap();
+                    }
+                }
+            }
         }
     }
 }
@@ -766,5 +797,57 @@ mod tests {
             }),
         )
         .unwrap();
+    }
+
+    #[test]
+    fn test_dct_links_have_kw() {
+        let pt = create_prefix_tree(
+            add_keyword_slot(vec![
+                String::from("ab"),
+                String::from("abc"),
+                String::from("bcd"),
+                String::from("cd"),
+                String::from("acdb"),
+            ]),
+            None,
+        )
+        .unwrap();
+
+        let mut total_dct = 0;
+        for node in &pt.nodes {
+            if let Some(nid) = dbg!(node).fail_dct() {
+                total_dct += 1;
+                dbg!(pt.get_node_unchecked(nid)).value_keyword().unwrap();
+            }
+        }
+        // Expect bcd -> cd, acd -> cd
+        assert_eq!(total_dct, 2);
+    }
+
+    #[test]
+    fn test_dct_links_vals() {
+        let pt = create_prefix_tree(
+            add_keyword_slot(vec![
+                String::from("ab"),
+                String::from("abc"),
+                String::from("bcd"),
+                String::from("cd"),
+                String::from("acdb"),
+            ]),
+            None,
+        )
+        .unwrap();
+
+        let bcd_id = pt.node_by_path("bcd").unwrap();
+        let bcd_node = pt.get_node_unchecked(bcd_id);
+
+        let cd_id = pt.node_by_path("cd").unwrap();
+
+        let acd_id = pt.node_by_path("acd").unwrap();
+        let acd_node = pt.get_node_unchecked(acd_id);
+
+        // Expect bcd -> cd, acd -> cd
+        assert_eq!(bcd_node.dct_to.unwrap(), cd_id);
+        assert_eq!(acd_node.dct_to.unwrap(), cd_id);
     }
 }

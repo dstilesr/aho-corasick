@@ -153,12 +153,7 @@ impl TrieRoot {
                         matches.push(m);
                     }
                 }
-                match check.fail_node() {
-                    None => return Err(SearchError::MissingLink(check_id)),
-                    Some(nid) => {
-                        check_id = nid;
-                    }
-                }
+                check_id = check.fail_dct().unwrap_or(root_id);
             }
             idx += 1;
         }
