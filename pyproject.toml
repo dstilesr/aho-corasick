@@ -1,6 +1,6 @@
 [project]
 name = "ac-search"
-version = "0.0.1-beta11"
+version = "0.0.1-beta12"
 description = "Aho Corasick algorithm for efficient text searches - implemented in Rust!"
 readme = "README.md"
 requires-python = ">=3.11,<4"
