@@ -1,4 +1,4 @@
-use super::{Link, RingBuffer, SearchError, SearchResult, TrieRoot};
+use super::{RingBuffer, SearchError, SearchResult, TrieRoot};
 
 /// Return whether the given character is a "word character", i.e. a Unicode
 /// alphanumeric character, a number or an underscore.
@@ -133,9 +133,9 @@ impl TrieRoot {
 
             // Move to node if edge available. Now we are at a node with the
             // right last character or at root.
-            if let Some(Link(_, nid)) = current.follow_link(ch) {
-                curr_id = *nid;
-                current = self.get_node_unchecked(*nid);
+            if let Some(nid) = current.follow_link(ch) {
+                curr_id = nid;
+                current = self.get_node_unchecked(nid);
             }
 
             // Check for matches

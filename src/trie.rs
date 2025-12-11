@@ -144,11 +144,11 @@ impl Node {
     ///
     /// Use binary search to search for a link that has the given character. Returns None
     /// if there is no following link indexed with the given character.
-    pub fn follow_link(&self, ch: char) -> Option<&Link> {
-        let nxt = self.next_nodes();
-        nxt.binary_search_by_key(&ch, |Link(c, _)| *c)
+    pub fn follow_link(&self, ch: char) -> Option<NodeId> {
+        self.nxt
+            .binary_search_by_key(&ch, |Link(c, _)| *c)
             .ok()
-            .map(|i| &nxt[i])
+            .map(|i| self.nxt[i].1)
     }
 
     /// Get the value and keyword of the node. These are not None if the node is a dictionary node.
@@ -255,9 +255,9 @@ impl TrieRoot {
             self.max_pattern_len = characters.len();
         }
 
-        for (i, c) in characters.iter().enumerate() {
-            match self.get_node_unchecked(current_id).follow_link(*c) {
-                Some(Link(_, nid)) => current_id = *nid,
+        for (i, &c) in characters.iter().enumerate() {
+            match self.get_node_unchecked(current_id).follow_link(c) {
+                Some(nid) => current_id = nid,
                 None => {
                     // Next node not already present - add it to the trie
                     let (val, key) = if i == characters.len() - 1 {
@@ -266,7 +266,7 @@ impl TrieRoot {
                         (None, None)
                     };
                     let node_id = self.add_node(Node::new(val, key));
-                    self.add_link(current_id, node_id, *c, false)?;
+                    self.add_link(current_id, node_id, c, false)?;
 
                     current_id = node_id;
                 }
@@ -310,9 +310,9 @@ impl TrieRoot {
             let mut check = self.get_node(check_id)?;
             loop {
                 match check.follow_link(edge_char) {
-                    Some(Link(c, nid)) => {
+                    Some(nid) => {
                         // Found the node
-                        self.add_link(current_id, *nid, *c, true)?;
+                        self.add_link(current_id, nid, '\0', true)?;
                         break;
                     }
                     None => {
@@ -346,8 +346,8 @@ impl TrieRoot {
         let mut current = self.root_node_id();
         for c in path.chars() {
             let curr_node = self.get_node(current).unwrap();
-            if let Some(Link(_, nid)) = curr_node.follow_link(c) {
-                current = *nid;
+            if let Some(nid) = curr_node.follow_link(c) {
+                current = nid;
             } else {
                 return None;
             }
