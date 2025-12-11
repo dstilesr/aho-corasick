@@ -1,5 +1,5 @@
 //! CLI Application to Run Simple Searches and Save Results as TSV
-use ah_search_rs::trie;
+use ac_search_rs::trie;
 use std::{
     fmt::Display,
     fs,

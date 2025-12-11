@@ -9,6 +9,7 @@
 - [Environment Setup](#environment-setup)
 - [Installation](#installation)
 - [Unit Tests](#unit-tests)
+- [Code Quality](#code-quality)
 
 ## About
 
@@ -110,13 +111,24 @@ for match in trie.search(haystack):
 ## Environment Setup
 To set up your environment for development, you must have the Rust development tools (the Rust compiler and `cargo`) installed on your machine. Next, set up a python virtual environment with the python version you want to build for with `uv`, and install the development dependencies: `uv sync --all-groups`.
 
-## Installation
-In order to install the library for development, you can compile a debug build and install it in your Python virtualenv with Maturin, use `maturin develop`. To compile a release build and get a python `.whl` file, you can use one of the following:
+This project uses [Go-Task](https://taskfile.dev/) to simplify common development workflows. Install it following the instructions on their website, then run `task --list` to see available tasks.
 
-- `maturin build --release`: This will output the wheel to the `target/wheels` directory.
+## Installation
+In order to install the library for development, you can compile a debug build and install it in your Python virtualenv with Maturin: `maturin develop` (or `task install-develop`). To compile a release build and get a python `.whl` file, you can use one of the following:
+
+- `maturin build --release` (or `task build-wheel`): This will output the wheel to the `target/wheels` directory.
 - `uv build`: This will output the wheel to the `dist` directory by default.
 
 Once you have the wheel, you can install it in other environments. Note however, that they must have the same Python minor version as the virtual environment where you compiled the wheel, and must run on the same operating system / architecture as the environment where you ran the build.
 
+You can also build just the Rust library with `task build-rust-lib`.
+
 ## Unit Tests
-The projects contains unit tests for both Python and Rust. You can run them with `cargo test`and `uv run pytest`, respectively. To run the python tests, you must first have a develop build compiled and installed.
+The project contains unit tests for both Python and Rust. You can run them with `cargo test` (or `task test-rs`) and `uv run pytest` (or `task test-py`), respectively. To run the Python tests, you must first have a develop build compiled and installed.
+
+For a complete development workflow that runs Rust tests, rebuilds the development package, and then runs Python tests, use `task refresh-dev-build`.
+
+## Code Quality
+Run `task check` to verify code quality. This runs `cargo check`, `cargo clippy`, and `ruff check` to catch compilation errors and lint issues.
+
+To clean up all build artifacts and caches, run `task clean`.

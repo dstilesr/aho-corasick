@@ -1,0 +1,80 @@
+version: "3"
+tasks:
+  test-rs:
+    desc: Run tests on the Rust codebase using cargo
+    sources:
+      - "src/**/*.rs"
+      - "Cargo.toml"
+    cmd: cargo test {{.CLI_ARGS}}
+
+  test-py:
+    desc: Run tests on the python code with pytest
+    deps:
+      - "install-develop"
+    sources:
+      - "src/**/*.rs"
+      - "python-src/**/*.py"
+      - "python-src/**/*.pyi"
+      - "pyproject.toml"
+      - "Cargo.toml"
+      - "tests/*.py"
+    cmd: uv run pytest {{.CLI_ARGS}}
+
+  build-wheel:
+    desc: Build the python package wheel (release profile)
+    sources:
+      - "src/**/*.rs"
+      - "python-src/**/*.py"
+      - "python-src/**/*.pyi"
+      - "pyproject.toml"
+      - "Cargo.toml"
+    generates:
+      - "target/wheels/*.whl"
+    cmd: uv run maturin build --release
+
+  build-rust-lib:
+    desc: Build the Rust library binary (release profile)
+    cmd: cargo build --lib --release
+
+  cargo-check:
+    desc: Check all targets with cargo to ensure the program compiles.
+    internal: true
+    sources:
+      - "src/**/*.rs"
+      - "examples/**/*.rs"
+      - "Cargo.toml"
+    cmds:
+      - cargo check --all-targets --all-features
+      - cargo clippy --all-targets --all-features
+
+  check:
+    desc: Run linter / checks to verify the code.
+    cmds:
+      # Separate task with caching since cargo check can be expensive
+      - task: cargo-check
+      - uv run ruff check
+
+  install-develop:
+    desc: Install the development package in the python environment with maturin
+    sources:
+      - "src/**/*.rs"
+      - "python-src/**/*.py"
+      - "python-src/**/*.pyi"
+      - "pyproject.toml"
+      - "Cargo.toml"
+    cmd: uv run maturin develop
+
+  refresh-dev-build:
+    desc: Refresh the installed development build and run unit tests.
+    cmds:
+      - task: test-rs
+      - task: install-develop
+      - task: test-py
+
+  clean:
+    desc: Remove all built and cache artifacts
+    cmds:
+      - rm -rf target
+      - rm -rf dist
+      - rm -rf .pytest_cache
+      - rm -rf .ruff_cache

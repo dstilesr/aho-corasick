@@ -41,3 +41,6 @@ test-files/
 
 # Profiling
 profile.json*
+
+# Taskfile
+.task/
