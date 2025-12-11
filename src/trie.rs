@@ -84,7 +84,7 @@ impl Node {
     ///
     /// Example
     /// ```rust
-    /// use ah_search_rs::trie::Node;
+    /// use ac_search_rs::trie::Node;
     ///
     /// let node_1 = Node::new(Some(String::from("variant")), Some(String::from("Standard Variant")));
     ///
@@ -397,7 +397,7 @@ pub fn add_keyword_slot(patterns: Vec<String>) -> Vec<(String, Option<String>)> 
 ///
 /// Examples
 /// ```rust
-/// use ah_search_rs::trie;
+/// use ac_search_rs::trie;
 ///
 /// let my_dictionary = trie::add_keyword_slot(vec![
 ///     String::from("abc"),

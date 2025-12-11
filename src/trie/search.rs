@@ -77,7 +77,7 @@ impl TrieRoot {
     ///
     /// Example:
     /// ```rust
-    /// use ah_search_rs::trie::{self, Match};
+    /// use ac_search_rs::trie::{self, Match};
     ///
     /// let search_dictionary = trie::add_keyword_slot(vec![
     ///     String::from("a"),

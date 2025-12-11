@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [lib]
-name = "ah_search_rs"
+name = "ac_search_rs"
 path = "src/lib.rs"
 crate-type = ["cdylib", "rlib"]
 

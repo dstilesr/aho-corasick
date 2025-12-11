@@ -2,7 +2,7 @@
 Aho-Corasick algorithm for efficient text searches - implemented in Rust!
 """
 
-from .ah_search_rs import (
+from .ac_search_rs import (
     PyMatch,
     PyTrie,
     normalize_string,

@@ -281,7 +281,7 @@ fn search_in_texts(
 
 /// The module to expose as importable from Python.
 #[pyo3::pymodule]
-#[pyo3(name = "ah_search_rs")]
+#[pyo3(name = "ac_search_rs")]
 pub mod aho_corasick_search {
     use pyo3::prelude::*;
 

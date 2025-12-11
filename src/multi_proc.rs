@@ -24,7 +24,7 @@ pub fn get_total_threads() -> usize {
 ///
 /// Example
 /// ```rust
-/// use ah_search_rs::multi_proc;
+/// use ac_search_rs::multi_proc;
 ///
 /// let items: Vec<i32> = (0..1000).collect();
 /// let mapped: Vec<i32> = multi_proc::parallel_apply(items, |num| num * 2 + 1, None);

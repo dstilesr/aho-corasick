@@ -19,7 +19,7 @@ This is a string search library that uses the Aho-Corasick algorithm to find occ
 
 #### Rust Examples
 ```rust
-use ah_search_rs::trie;
+use ac_search_rs::trie;
 
 // Dictionary of strings to find in a text
 let dictionary = trie::add_keyword_slot(vec![
@@ -58,7 +58,7 @@ for m in matches {
 
 **Example Using the Search Functions**
 ```python
-import ah_search as acs
+import ac_search as acs
 
 dictionary = acs.to_dictionary(["find", "Ding", "these", "fun", "WORDs"])
 haystack = "Finding words in these texts is a lot of fun!"
@@ -79,7 +79,7 @@ for match in acs.search_in_text(dictionary, haystack, case_sensitive=False):
 
 **Example Using the Trie Object**
 ```python
-import ah_search as acs
+import ac_search as acs
 
 dictionary = {
     "find": "Find",
