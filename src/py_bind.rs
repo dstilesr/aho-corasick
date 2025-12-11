@@ -7,6 +7,7 @@ use super::trie::*;
 use pyo3::exceptions as py_errs;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
+use std::collections::HashSet;
 use unicode_normalization::UnicodeNormalization;
 
 /// Normalize the given string to unicode NFC standard. This is needed to
@@ -139,15 +140,16 @@ impl PyTrie {
         });
         let trie_inner = create_prefix_tree(entries, opts).map_err(map_error_py)?;
 
-        let mut keywords = Vec::new();
+        // Avoid storing duplicates
+        let mut keywords = HashSet::with_capacity(dictionary.len());
         for node in trie_inner.nodes_vec() {
             if let Some((_, keyword)) = node.value_keyword() {
-                keywords.push(keyword.to_string());
+                keywords.insert(keyword.to_string());
             }
         }
         Ok(Self {
             trie_inner,
-            keywords,
+            keywords: keywords.drain().collect(),
         })
     }
 

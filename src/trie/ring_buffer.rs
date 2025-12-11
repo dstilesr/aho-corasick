@@ -35,6 +35,12 @@ impl<T: Copy> RingBuffer<T> {
         self.values.len()
     }
 
+    /// Return whether the buffer is empty
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.values.is_empty()
+    }
+
     /// Get the item at the given index. Panics if the index is out of bounds.
     pub fn get_item(&self, index: usize) -> T {
         if index >= self.len() {
