@@ -551,16 +551,16 @@ mod tests {
         assert_eq!(chars, ['b', 'd']);
 
         // Nonexistent nodes
-        if let Some(_) = dbg!(pt.node_by_path("cdb")) {
+        if dbg!(pt.node_by_path("cdb")).is_some() {
             panic!("Did not expect to find node!")
         }
-        if let Some(_) = dbg!(pt.node_by_path("xyz")) {
+        if dbg!(pt.node_by_path("xyz")).is_some() {
             panic!("Did not expect to find node!")
         }
-        if let Some(_) = dbg!(pt.node_by_path("abd")) {
+        if dbg!(pt.node_by_path("abd")).is_some() {
             panic!("Did not expect to find node!")
         }
-        if let Some(_) = dbg!(pt.node_by_path("")) {
+        if dbg!(pt.node_by_path("")).is_some() {
             panic!("Did not expect to find node!")
         }
     }
