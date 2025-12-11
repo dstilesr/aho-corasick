@@ -1,10 +1,10 @@
-use super::{Link, SearchError, SearchResult, TrieRoot};
-use std::collections::VecDeque;
+use super::{Link, RingBuffer, SearchError, SearchResult, TrieRoot};
 
 /// Return whether the given character is a "word character", i.e. a Unicode
 /// alphanumeric character, a number or an underscore.
+#[inline]
 fn is_word_char(c: char) -> bool {
-    c.is_alphanumeric() || c == '_'
+    c.is_ascii_alphanumeric() || c == '_' || (!c.is_ascii() && c.is_alphanumeric())
 }
 
 /// Represents a match found in a text.
@@ -35,9 +35,9 @@ pub struct Match<'a> {
 
 impl<'a> Match<'a> {
     /// Instantiate a new match from a value and 1 + index of the last character in the match.
-    pub fn new(value: &'a str, kw: &'a str, end_pos: usize) -> Self {
+    pub fn new(value: &'a str, kw: &'a str, end_pos: usize, length: usize) -> Self {
         Self {
-            start: end_pos - value.chars().count(),
+            start: end_pos - length,
             end: end_pos,
             kw,
             value,
@@ -62,9 +62,9 @@ impl<'a> Match<'a> {
 
 /// Check if a match is word bounded. That is, check if the preceding and following characters
 /// are not word-characters.
-fn is_word_bounded(m: &Match, buffer: &VecDeque<char>, next_char: Option<char>) -> bool {
+fn is_word_bounded(m: &Match, buffer: &RingBuffer<char>, next_char: Option<char>) -> bool {
     let pat_len = m.end - m.start;
-    let left = m.start == 0 || (!is_word_char(buffer[buffer.len() - pat_len - 1]));
+    let left = m.start == 0 || (!is_word_char(buffer.get_item(buffer.len() - pat_len - 1)));
     let right = match next_char {
         None => true,
         Some(ch) => !is_word_char(ch),
@@ -98,7 +98,7 @@ impl TrieRoot {
     /// }
     /// ```
     pub fn find_text_matches<'a>(&'a self, mut text: String) -> SearchResult<Vec<Match<'a>>> {
-        let mut char_buffer = VecDeque::with_capacity(self.max_pattern_len + 2);
+        let mut char_buffer = RingBuffer::new(self.max_pattern_len + 2);
         if !self.options.case_sensitive {
             text = text.to_lowercase();
         };
@@ -114,10 +114,7 @@ impl TrieRoot {
         while let Some(ch) = chars_iter.next() {
             // Buffer updates
             if self.options.check_bounds {
-                if char_buffer.len() >= (self.max_pattern_len + 1) {
-                    char_buffer.pop_front();
-                }
-                char_buffer.push_back(ch);
+                char_buffer.push(ch);
             }
 
             // Node does not have link with the required char - try failovers
@@ -146,7 +143,7 @@ impl TrieRoot {
             while check_id != root_id {
                 let check = self.get_node_unchecked(check_id);
                 if let Some((value, keyword)) = check.value_keyword() {
-                    let m = Match::new(value, keyword, idx + 1);
+                    let m = Match::new(value, keyword, idx + 1, check.pattern_len);
                     let nxt_ch: Option<char> = chars_iter.peek().copied();
 
                     if (!self.options.check_bounds) || is_word_bounded(&m, &char_buffer, nxt_ch) {

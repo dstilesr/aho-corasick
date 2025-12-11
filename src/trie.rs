@@ -1,6 +1,7 @@
 use std::collections::VecDeque;
 use unicode_normalization::UnicodeNormalization;
-
+pub mod ring_buffer;
+pub use ring_buffer::RingBuffer;
 pub mod search;
 pub use search::*;
 
@@ -63,6 +64,7 @@ pub struct Node {
     nxt: Vec<Link>,
     fail_to: Option<NodeId>,
     dct_to: Option<NodeId>,
+    pattern_len: usize,
 }
 
 impl Default for Node {
@@ -74,6 +76,7 @@ impl Default for Node {
             nxt: Vec::new(),
             fail_to: None,
             dct_to: None,
+            pattern_len: 0,
         }
     }
 }
@@ -94,13 +97,17 @@ impl Node {
     pub fn new(value: Option<String>, keyword: Option<String>) -> Self {
         match value {
             None => Self::default(),
-            Some(s) => Self {
-                keyword: Some(keyword.unwrap_or_else(|| s.clone())),
-                value: Some(s),
-                nxt: Vec::new(),
-                fail_to: None,
-                dct_to: None,
-            },
+            Some(s) => {
+                let total_chars = s.chars().count();
+                Self {
+                    keyword: Some(keyword.unwrap_or_else(|| s.clone())),
+                    value: Some(s),
+                    nxt: Vec::new(),
+                    fail_to: None,
+                    dct_to: None,
+                    pattern_len: total_chars,
+                }
+            }
         }
     }
 
