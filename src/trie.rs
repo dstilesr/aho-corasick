@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 use unicode_normalization::UnicodeNormalization;
 pub mod ring_buffer;
 pub use ring_buffer::RingBuffer;
@@ -61,7 +61,7 @@ impl Default for SearchOptions {
 pub struct Node {
     value: Option<String>,
     keyword: Option<String>,
-    nxt: HashMap<char, NodeId>,
+    nxt: Vec<Link>,
     fail_to: Option<NodeId>,
     dct_to: Option<NodeId>,
     pattern_len: usize,
@@ -73,7 +73,7 @@ impl Default for Node {
         Self {
             value: None,
             keyword: None,
-            nxt: HashMap::new(),
+            nxt: Vec::new(),
             fail_to: None,
             dct_to: None,
             pattern_len: 0,
@@ -102,7 +102,7 @@ impl Node {
                 Self {
                     keyword: Some(keyword.unwrap_or_else(|| s.clone())),
                     value: Some(s),
-                    nxt: HashMap::new(),
+                    nxt: Vec::new(),
                     fail_to: None,
                     dct_to: None,
                     pattern_len: total_chars,
@@ -113,7 +113,7 @@ impl Node {
 
     /// Add a link to the node. The link is pushed to the node's list of following nodes.
     fn add_link(&mut self, link: Link) {
-        self.nxt.insert(link.0, link.1);
+        self.nxt.push(link);
     }
 
     /// Set the node's failure node to the given node ID.
@@ -121,9 +121,9 @@ impl Node {
         self.fail_to.replace(node_id);
     }
 
-    /// Get the map of following nodes
+    /// Get the vector of following nodes
     #[inline]
-    pub fn next_nodes(&self) -> &HashMap<char, NodeId> {
+    pub fn next_nodes(&self) -> &Vec<Link> {
         &self.nxt
     }
 
@@ -144,9 +144,11 @@ impl Node {
     ///
     /// Use binary search to search for a link that has the given character. Returns None
     /// if there is no following link indexed with the given character.
-    #[inline]
     pub fn follow_link(&self, ch: char) -> Option<NodeId> {
-        self.nxt.get(&ch).copied()
+        self.nxt
+            .binary_search_by_key(&ch, |Link(c, _)| *c)
+            .ok()
+            .map(|i| self.nxt[i].1)
     }
 
     /// Get the value and keyword of the node. These are not None if the node is a dictionary node.
@@ -281,7 +283,8 @@ impl TrieRoot {
     fn compute_failure_links(&mut self) -> SearchResult<()> {
         // Initialize queue with (parent_id, child_id, edge_char) tuples
         let mut queue = VecDeque::with_capacity(self.total_nodes());
-        for (c, node_id) in self.root_node().next_nodes().iter() {
+        for link in self.root_node().next_nodes() {
+            let Link(c, node_id) = link;
             queue.push_back((self.root_node_id(), *node_id, *c));
         }
 
@@ -289,7 +292,7 @@ impl TrieRoot {
         while let Some((parent_id, current_id, edge_char)) = queue.pop_front() {
             // Push children to queue
             let curr_node = self.get_node(current_id)?;
-            for (c, nid) in curr_node.next_nodes().iter() {
+            for Link(c, nid) in curr_node.next_nodes() {
                 queue.push_back((current_id, *nid, *c));
             }
 
@@ -355,6 +358,10 @@ impl TrieRoot {
     /// Sort the lists of next links for all the nodes in the tree. This should be called just
     /// once when initializing. Also assigns the dictionary failure nodes.
     fn finalize_links(&mut self) {
+        for node in self.nodes.iter_mut() {
+            node.nxt.sort();
+        }
+
         for i in 0..self.nodes.len() {
             if i == self.root_node_id() {
                 continue;
@@ -475,7 +482,12 @@ mod tests {
         assert!(pt.root_node().fail_node().is_none());
         assert_eq!(pt.root_node().next_nodes().len(), 2);
 
-        let mut root_chars: Vec<char> = pt.root_node().next_nodes().keys().copied().collect();
+        let mut root_chars: Vec<char> = pt
+            .root_node()
+            .next_nodes()
+            .iter()
+            .map(|Link(c, _)| *c)
+            .collect();
 
         root_chars.sort();
         assert_eq!(root_chars[0], 'a');
@@ -524,7 +536,8 @@ mod tests {
             }
         };
         assert_eq!(ab_nxt.len(), 1);
-        assert!(ab_node.follow_link('c').is_some());
+        let Link(c, _) = ab_nxt[0];
+        assert_eq!(c, 'c');
 
         // Check 'c' node
         let c_node = pt.get_node(pt.node_by_path("c").unwrap()).unwrap();
@@ -533,8 +546,9 @@ mod tests {
             Some(_) => panic!("Expected intermediate node"),
         };
         assert_eq!(c_nxt.len(), 2);
-        assert!(c_node.follow_link('b').is_some());
-        assert!(c_node.follow_link('d').is_some());
+        let mut chars: Vec<char> = c_nxt.iter().map(|Link(c, _)| *c).collect();
+        chars.sort();
+        assert_eq!(chars, ['b', 'd']);
 
         // Nonexistent nodes
         if let Some(_) = dbg!(pt.node_by_path("cdb")) {
