@@ -36,6 +36,20 @@ pub type SearchResult<T> = Result<T, SearchError>;
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Link(char, NodeId);
 
+impl Link {
+    /// Get the character element of the link
+    #[inline]
+    fn get_char(&self) -> char {
+        self.0
+    }
+
+    /// Get the Node ID element of the link
+    #[inline]
+    fn get_node_id(&self) -> NodeId {
+        self.1
+    }
+}
+
 /// Options to use when performing searches
 #[derive(Debug)]
 pub struct SearchOptions {
@@ -145,10 +159,19 @@ impl Node {
     /// Use binary search to search for a link that has the given character. Returns None
     /// if there is no following link indexed with the given character.
     pub fn follow_link(&self, ch: char) -> Option<NodeId> {
-        self.nxt
-            .binary_search_by_key(&ch, |Link(c, _)| *c)
-            .ok()
-            .map(|i| self.nxt[i].1)
+        if self.nxt.len() < 8 {
+            // Small array: simple search
+            self.nxt
+                .iter()
+                .find(|&l| l.get_char() == ch)
+                .map(|l| l.get_node_id())
+        } else {
+            // Larger array: binary search
+            self.nxt
+                .binary_search_by_key(&ch, |l| l.get_char())
+                .ok()
+                .map(|i| self.nxt[i].get_node_id())
+        }
     }
 
     /// Get the value and keyword of the node. These are not None if the node is a dictionary node.
